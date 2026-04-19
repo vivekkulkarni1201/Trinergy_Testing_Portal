@@ -82,6 +82,7 @@ function assignBay() {
 
   render();
 }
+
 function moveTSTToHeatrun() {
   let id = document.getElementById("stageUpsSelect").value;
   let ups = UPS_LIST.find(u => u.id === id);
@@ -104,6 +105,7 @@ function moveTSTToHeatrun() {
 
   render();
 }
+
 function updateStage() {
   let id = document.getElementById("stageUpsSelect").value;
   let section = document.getElementById("sectionSelect").value;
