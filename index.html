@@ -4,7 +4,6 @@
   <title>Trinergy Portal</title>
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
 <header>
@@ -16,7 +15,6 @@
   <div class="card">Completed: <span id="completedCount">0</span></div>
 </section>
 
-<!-- ADD UPS -->
 <section class="panel">
   <h3>Add UPS</h3>
   <select id="upsType">
@@ -28,12 +26,24 @@
   <button onclick="addUPS()">Add</button>
 </section>
 
-<!-- ASSIGN BAY -->
 <section class="panel">
   <h3>Assign Bay</h3>
-  <select id="upsSelect"></select>
+  <select id="upsSelect" onchange="updateDropdowns()"></select>
   <select id="baySelect"></select>
   <button onclick="assignBay()">Assign</button>
+</section>
+
+<section class="panel">
+  <h3>Update Stage</h3>
+  <select id="stageUpsSelect" onchange="updateStageControls()"></select>
+  <select id="sectionSelect" onchange="updateStageDropdown()">
+    <option value="">Select Section</option>
+    <option value="LV">LV</option>
+    <option value="HV">HV</option>
+    <option value="HEATRUN">HEATRUN</option>
+  </select>
+  <select id="stageSelect"></select>
+  <button onclick="updateStage()">Update Stage</button>
 </section>
 
 <section>
