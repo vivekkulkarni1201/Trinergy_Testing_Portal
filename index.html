@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trinergy Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+  <h1>TRINERGY CONTROL CENTER</h1>
+</header>
+
+<section class="kpi">
+  <div class="card">Active UPS: <span id="activeCount">0</span></div>
+  <div class="card">Completed: <span id="completedCount">0</span></div>
+</section>
+
+<!-- ADD UPS -->
+<section class="panel">
+  <h3>Add UPS</h3>
+  <select id="upsType">
+    <option value="">Select Type</option>
+    <option value="T3X">T3X</option>
+    <option value="T2X">T2X</option>
+    <option value="TST">TST</option>
+  </select>
+  <button onclick="addUPS()">Add</button>
+</section>
+
+<!-- ASSIGN BAY -->
+<section class="panel">
+  <h3>Assign Bay</h3>
+  <select id="upsSelect"></select>
+  <select id="baySelect"></select>
+  <button onclick="assignBay()">Assign</button>
+</section>
+
+<section>
+  <h2>Awaiting Bay</h2>
+  <div id="awaiting"></div>
+</section>
+
+<section>
+  <h2>Bays</h2>
+  <div class="bayContainer" id="bays"></div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
