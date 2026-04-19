@@ -47,29 +47,7 @@ function addUPS() {
   render();
 }
 
-function assignBay() 
-function moveTSTToHeatrun() {
-  let id = document.getElementById("stageUpsSelect").value;
-  let ups = UPS_LIST.find(u => u.id === id);
-
-  if (!ups) return;
-
-  if (ups.type !== "TST") {
-    alert("Only TST can be moved to STS HEATRUN");
-    return;
-  }
-
-  if (ups.bay !== "STS TEST") {
-    alert("TST can be moved only from STS TEST");
-    return;
-  }
-
-  ups.bay = "STS HEATRUN";
-  ups.section = "HEATRUN";
-  ups.stage = "Burn In";
-
-  render();
-}{
+function assignBay() {
   let id = document.getElementById("upsSelect").value;
   let bay = document.getElementById("baySelect").value;
 
@@ -104,7 +82,28 @@ function moveTSTToHeatrun() {
 
   render();
 }
+function moveTSTToHeatrun() {
+  let id = document.getElementById("stageUpsSelect").value;
+  let ups = UPS_LIST.find(u => u.id === id);
 
+  if (!ups) return;
+
+  if (ups.type !== "TST") {
+    alert("Only TST can be moved to STS HEATRUN");
+    return;
+  }
+
+  if (ups.bay !== "STS TEST") {
+    alert("TST can be moved only from STS TEST");
+    return;
+  }
+
+  ups.bay = "STS HEATRUN";
+  ups.section = "HEATRUN";
+  ups.stage = "Burn In";
+
+  render();
+}
 function updateStage() {
   let id = document.getElementById("stageUpsSelect").value;
   let section = document.getElementById("sectionSelect").value;
