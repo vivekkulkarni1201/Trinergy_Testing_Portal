@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trinergy Testing Live Dashboard</title>
+  <style>
+    :root{
+      --bg:#0c1322;
+      --panel:#17233b;
+      --panel2:#1f2f4f;
+      --border:#31486f;
+      --text:#eef5ff;
+      --muted:#a8bad8;
+      --accent:#ff4d4d;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#12203d;border-bottom:3px solid var(--accent);position:sticky;top:0;z-index:5}
+    .brand{display:flex;align-items:center;gap:14px}.logo{font-size:28px;font-weight:800;color:white}
+    .title{font-size:20px;font-weight:800}.subtitle{font-size:13px;color:var(--muted)}
+    .clock{background:#1a2845;border:1px solid var(--border);padding:10px 14px;border-radius:10px;font-weight:700}
+    .page{padding:18px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+    h2,h3,h4{margin:0 0 12px}.kpi-table-wrap{margin-bottom:14px}.table-scroll{overflow:auto}
+    .kpi-table{width:100%;border-collapse:collapse}.kpi-table th,.kpi-table td{border:1px solid var(--border);padding:10px 12px;text-align:center}.kpi-table th{background:#c62828;color:#fff}
+    .status-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}.status-list{line-height:1.8}
+    .control-row{margin-bottom:14px}.form-row,.form-col,.button-wrap{display:flex;gap:10px;flex-wrap:wrap}.form-col{flex-direction:column}
+    select,button{border-radius:10px;border:1px solid var(--border);padding:10px 12px;font-size:14px}select{min-width:180px;background:#0f1a2f;color:var(--text)}
+    .btn{cursor:pointer;font-weight:700;color:white}.btn:disabled{opacity:.45;cursor:not-allowed}.btn-primary{background:#1c5cc8}.btn-success{background:#1d7d49}.btn-danger{background:#b73131}.btn-secondary{background:#51408d}.btn-warning{background:#b0761f}
+    .two-col-layout{display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:start}.left-col{display:flex;flex-direction:column;gap:14px}
+    .stack-list{display:flex;flex-direction:column;gap:10px;min-height:56px}
+    .waiting-card,.rework-card,.temp-card,.ups-card{background:#0f1a2f;border:1px solid var(--border);border-radius:12px;padding:10px}
+    .waiting-card,.rework-card,.temp-card{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .bay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}.bay-card .bay-head{font-weight:800;font-size:16px;margin-bottom:12px;border-bottom:2px solid var(--accent);padding-bottom:8px}
+    .slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.slot-card{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:10px}
+    .slot-head{font-weight:800;color:#d4e2ff;margin-bottom:10px}.slot-body{min-height:120px;display:flex;flex-direction:column;gap:10px}.single-slot{min-height:160px}
+    .ups-card{cursor:pointer;transition:transform .12s ease,border-color .12s ease}.ups-card:hover{transform:translateY(-1px);border-color:#6ea4ff}.ups-card.selected{border-color:#ffd166}
+    .serial{font-weight:800}.weektag{color:var(--muted);font-size:12px}.meta{font-size:13px;color:#d7e3ff;line-height:1.6}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800;margin-top:6px}.badge-running{background:#5b3b0c;color:#ffd78a}.badge-temp{background:#5b3b0c;color:#ffd78a}.badge-rta{background:#47306d;color:#e1d0ff}
+    .tiny{font-size:12px}.muted{color:var(--muted)}.hidden{display:none}.timer-line{margin-top:6px;color:#ffd78a;font-weight:800}.locked-note{color:#ffd78a;font-size:12px;margin-top:6px}.locked-control{opacity:.55;pointer-events:none}
+    .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.detail-item{background:#0f1a2f;border:1px solid var(--border);border-radius:10px;padding:10px}
+    .section-block{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}.checklist{display:flex;flex-direction:column;gap:10px}
+    .check-group{background:#0f1a2f;border:1px solid var(--border);border-radius:10px;padding:10px}.check-row{display:flex;justify-content:space-between;gap:12px;padding:4px 0}.empty-slot{color:var(--muted);font-style:italic;padding:8px 0}
+
+    .quick-summary-row{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .mini-card{
+      background:linear-gradient(135deg,#17233b,#1f2f4f);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 8px 20px rgba(0,0,0,.16);
+    }
+    .mini-title{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-weight:800;
+    }
+    .mini-value{
+      font-size:18px;
+      font-weight:900;
+      margin-top:6px;
+      color:#ffffff;
+    }
+    .mini-sub{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:4px;
+    }
+    .bay-card{
+      position:relative;
+      overflow:hidden;
+    }
+    .bay-card:before{
+      content:"";
+      position:absolute;
+      left:0;top:0;bottom:0;
+      width:4px;
+      background:var(--accent);
+      opacity:.85;
+    }
+    .bay-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      color:#fff;
+    }
+    .slot-head{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .slot-head:before{
+      content:"";
+      display:inline-block;
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:#6ea4ff;
+    }
+    .ups-card{
+      background:linear-gradient(135deg,#0f1a2f,#162748);
+      border-left:4px solid #6ea4ff;
+    }
+    .ups-card .serial{
+      font-size:15px;
+      color:#fff;
+      margin-bottom:2px;
+    }
+    .waiting-card,.rework-card,.temp-card{
+      background:linear-gradient(135deg,#0f1a2f,#162748);
+      border-left:4px solid #6ea4ff;
+    }
+    .rework-card{border-left-color:#b084f5}
+    .temp-card{border-left-color:#ffb347}
+    .status-box.panel{
+      min-height:120px;
+    }
+    .status-box h3:after,.panel h2:after{
+      content:"";
+      display:block;
+      width:44px;
+      height:3px;
+      background:var(--accent);
+      border-radius:999px;
+      margin-top:8px;
+    }
+    .right-col.panel{
+      position:sticky;
+      top:88px;
+      max-height:calc(100vh - 110px);
+      overflow:auto;
+    }
+    .detail-item b{
+      color:#a8bad8;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.05em;
+    }
+    .check-row span:last-child{
+      font-weight:900;
+    }
+    button:hover:not(:disabled){
+      filter:brightness(1.12);
+      transform:translateY(-1px);
+    }
+    button{
+      transition:.12s ease;
+    }
+    select:focus,button:focus{
+      outline:2px solid #6ea4ff;
+      outline-offset:2px;
+    }
+    .kpi-table tbody tr:hover{
+      background:#203153;
+    }
+    .empty-slot{
+      border:1px dashed rgba(168,186,216,.35);
+      border-radius:10px;
+      padding:14px;
+      text-align:center;
+    }
+
+
+    .logo-wrap{
+      min-width:96px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .vertiv-logo{
+      max-width:110px;
+      max-height:42px;
+      object-fit:contain;
+      display:block;
+    }
+    .logo-fallback{
+      display:none;
+    }
+    .top-info{
+      background:#1a2845;
+      border:1px solid var(--border);
+      padding:9px 14px;
+      border-radius:12px;
+      font-weight:800;
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+      min-width:220px;
+      text-align:left;
+      font-size:13px;
+    }
+    .progress-wrap{
+      margin-top:8px;
+    }
+    .progress-text{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      font-size:12px;
+      color:#d7e3ff;
+      margin-bottom:4px;
+      font-weight:800;
+    }
+    .progress-bar{
+      height:7px;
+      background:#0b1220;
+      border:1px solid var(--border);
+      border-radius:999px;
+      overflow:hidden;
+    }
+    .progress-fill{
+      height:100%;
+      background:linear-gradient(90deg,#29d17d,#6ea4ff);
+      width:0%;
+    }
+    .pending-text{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:4px;
+    }
+
+    @media (max-width:1100px){.two-col-layout{grid-template-columns:1fr}}@media (max-width:1100px){.quick-summary-row{grid-template-columns:repeat(2,1fr)}}@media (max-width:850px){.status-row,.bay-grid,.slot-grid,.detail-grid,.quick-summary-row{grid-template-columns:1fr}}
+  
+    .rta-title,
+    .rework-title{
+      color:#ff6b4a !important;
+      text-shadow:0 0 10px rgba(255,107,74,.25);
+    }
+    .rework-card,
+    .rta-card{
+      border-left-color:#ff8c1a !important;
+      box-shadow:0 0 0 1px rgba(255,140,26,.18), 0 8px 20px rgba(0,0,0,.18);
+    }
+    .ups-card.rta-history .serial,
+    .rework-card .serial,
+    .rta-card .serial{
+      color:#ffb347 !important;
+      text-shadow:0 0 8px rgba(255,179,71,.18);
+    }
+    .ups-card.rta-history{
+      border-left-color:#ff8c1a !important;
+    }
+    .rta-badge{
+      display:inline-block;
+      margin-left:6px;
+      padding:2px 7px;
+      border-radius:999px;
+      background:rgba(255,140,26,.18);
+      border:1px solid rgba(255,140,26,.45);
+      color:#ffb347;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.04em;
+    }
+
+</style>
+</head>
+<body>
+  <!-- ADMIN CONNECTION ACTIVE: reads trinergyAdminV3 from localStorage for targets and timers -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-wrap">
+        <img src="vertiv-logo.png" class="vertiv-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <div class="logo logo-fallback">VERTIV</div>
+      </div>
+      <div>
+        <!-- APP TITLE CONFIG: Change the portal name below if required -->
+        <div class="title">TRINERGY TESTING LIVE DASHBOARD</div>
+        <div class="subtitle">Final Polish Build - TEST MODE - Patched Pre-Timer</div>
+      </div>
+    </div>
+    <div class="top-info">
+      <div id="topDate">Date: --</div>
+      <div id="liveClock">Time: --:--:--</div>
+      <div id="isoWeek">ISO Week: --</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="kpi-table-wrap panel">
+      <h2>KPI Summary</h2>
+      <div class="table-scroll">
+        <table class="kpi-table">
+          <thead>
+            <tr>
+              <th>Type</th><th>Monthly Target</th><th>Monthly Received</th><th>Monthly Completed</th><th>Monthly Pending</th><th>Weekly Target</th><th>Weekly Completed</th><th>Weekly Pending</th><th>Under Testing</th><th>RTA</th><th>FPY</th>
+            </tr>
+          </thead>
+          <tbody id="kpiBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="status-row">
+      <div class="status-box panel"><h3>Active UPS</h3><div id="activeUpsBox" class="status-list"></div></div>
+      <div class="status-box panel"><h3>Timed Events</h3><div id="timedEventsBox" class="status-list"></div></div>
+      <div class="status-box panel"><h3>Completed Today</h3><div id="completedTodayBox" class="status-list"></div></div>
+    </section>
+
+    <section class="quick-summary-row">
+      <div class="mini-card">
+        <div class="mini-title">System Mode</div>
+        <div class="mini-value">TEST MODE</div>
+        <div class="mini-sub">1 min timers for validation</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-title">Movement Rule</div>
+        <div class="mini-value">Free Movement</div>
+        <div class="mini-sub">Occupied slot / active timer blocks</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-title">Lock Rule</div>
+        <div class="mini-value">UPS Level</div>
+        <div class="mini-sub">Only running UPS is locked</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-title">Data Mode</div>
+        <div class="mini-value">Local Memory</div>
+        <div class="mini-sub">Online sync later</div>
+      </div>
+    </section>
+
+    <section class="control-row">
+      <div class="panel add-panel">
+        <h3>Add UPS</h3>
+        <div class="form-row">
+          <select id="upsType">
+            <option value="">Select Type</option>
+            <option value="T3X">T3X</option>
+            <option value="T2X">T2X</option>
+            <option value="TST">TST</option>
+          </select>
+          <button class="btn btn-primary" onclick="safeAction(addUPS)">Add UPS</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="two-col-layout">
+      <div class="left-col">
+        <section class="panel"><h3>Waiting for Assignment <span class="tiny muted">New UPS queue</span></h3><div id="waitingArea" class="stack-list"></div></section>
+        <section class="panel"><h3 class="rta-title">Rework Holding Area <span class="tiny muted">RTA only</span></h3><div id="reworkArea" class="stack-list"></div></section>
+        <section class="panel"><h3>Temporary Holding Area <span class="tiny muted">Parking / interchange</span></h3><div id="tempHoldArea" class="stack-list"></div></section>
+
+        <section class="bay-grid" id="bayGrid"></section>
+      </div>
+
+      <aside class="right-col panel">
+        <h3>Selected UPS Control Panel</h3>
+        <div id="noSelection" class="muted">Select a UPS from Waiting, Rework, or any bay card.</div>
+        <div id="actionPanel" class="hidden">
+          <div class="detail-grid" id="selectedDetails"></div>
+          <div class="section-block" id="moveSection"><h4>Move UPS</h4><div class="form-col"><select id="moveBay" onchange="updateMoveSlotOptions()"></select><select id="moveSlot"></select><button class="btn btn-primary" onclick="safeAction(moveSelectedUPS)">Move UPS</button><button id="tempHoldBtn" class="btn btn-warning" onclick="safeAction(moveSelectedToTempHold)">Move to Temporary Holding</button></div></div>
+          <div class="section-block" id="stageSection"><h4>Stage Update</h4><div class="form-col"><select id="stageSelect"></select><button class="btn btn-primary" onclick="safeAction(updateSelectedStage)">Update Stage</button></div></div>
+          <div class="section-block"><h4>Timed Events</h4><div id="timedActionButtons" class="button-wrap"></div><div class="tiny muted">Architecture only: timed-event controls are shown here. Timer engine comes next.</div></div>
+          <div class="section-block"><h4>Progress Checklist</h4><div id="progressChecklist" class="checklist"></div></div>
+          <div class="section-block" id="finalSection"><h4>Final Actions</h4><div class="button-wrap"><button id="toFinishingBtn" class="btn btn-success" onclick="safeAction(markToFinishing)">Mark To Finishing</button><button class="btn btn-danger" onclick="safeAction(returnToAssembly)">Return to Assembly</button></div></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    let UPS_LIST = [];
+    let SELECTED_UPS_ID = null;
+    let isProcessing = false;
+
+    const MONTHLY_TARGETS = { T3X: 20, T2X: 15, TST: 10 };
+    const WEEKLY_TARGETS = { T3X: 5, T2X: 4, TST: 3 };
+
+    function readAdminConfig() {
+      try {
+        return JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}");
+      } catch (e) {
+        return {};
+      }
+    }
+
+    
+    function getAdminActiveBays() {
+      const cfg = readAdminConfig();
+      const adminBays = (cfg.bays || []).filter(b => (b.status || "Active") === "Active");
+      if (!adminBays.length) return null;
+      return adminBays;
+    }
+
+    function getCoreBayNames() {
+      const adminBays = getAdminActiveBays();
+      if (adminBays) {
+        const names = adminBays.filter(b => b.type === "CORE").map(b => b.name);
+        if (names.length) return names;
+      }
+      return CORE_BAYS;
+    }
+
+    function getStsBayNames() {
+      const adminBays = getAdminActiveBays();
+      if (adminBays) {
+        const names = adminBays
+          .filter(b => String(b.type || "").toUpperCase() === "STS TEST" || String(b.type || "").toUpperCase() === "STS HEATRUN")
+          .map(b => b.name);
+        if (names.length) return names;
+      }
+      return STS_BAYS;
+    }
+
+    
+    function getBayRole(bayName) {
+      const cfg = readAdminConfig();
+      const row = (cfg.bays || []).find(b => b.name === bayName && (b.status || "Active") === "Active");
+      if (row) return String(row.type || "").toUpperCase();
+      if (CORE_BAYS.includes(bayName)) return "CORE";
+      if (bayName === "STS TEST") return "STS TEST";
+      if (bayName === "STS HEATRUN") return "STS HEATRUN";
+      return "";
+    }
+    function isCoreBay(bayName) { return getBayRole(bayName) === "CORE"; }
+    function isStsBay(bayName) { const r = getBayRole(bayName); return r === "STS TEST" || r === "STS HEATRUN"; }
+    function isStsTestBay(bayName) { return getBayRole(bayName) === "STS TEST"; }
+    function isStsHeatrunBay(bayName) { return getBayRole(bayName) === "STS HEATRUN"; }
+
+    function getAllBayNames() {
+      return [...getCoreBayNames(), ...getStsBayNames()];
+    }
+
+
+    function getAdminActiveStagesByGroup(groupName) {
+      const cfg = readAdminConfig();
+      const rows = (cfg.stages || []).filter(s =>
+        (s.status || "Active") === "Active" &&
+        String(s.group || "").toUpperCase() === String(groupName).toUpperCase()
+      );
+
+      if (!rows.length) return null;
+
+      return rows
+        .slice()
+        .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+        .map(s => s.name);
+    }
+
+    function getLvStages() {
+      return getAdminActiveStagesByGroup("LV") || LV_STAGES;
+    }
+
+    function getHvStages() {
+      // Admin HV group includes HV tests + heatrun tests for T3X/T2X.
+      return getAdminActiveStagesByGroup("HV") || [...HV_STAGES, ...HEATRUN_STAGES];
+    }
+
+    function getStsTestStages() {
+      return getAdminActiveStagesByGroup("STS TEST") || STS_TEST_STAGES;
+    }
+
+    function getStsHeatrunStages() {
+      return getAdminActiveStagesByGroup("STS HEATRUN") || STS_HEATRUN_STAGES;
+    }
+
+    function stageListForChecklist(ups, groupName) {
+      if (ups.type === "TST") {
+        if (groupName === "STS_TEST") return getStsTestStages();
+        if (groupName === "STS_HEATRUN") return getStsHeatrunStages();
+        return [];
+      }
+
+      if (groupName === "LV") return getLvStages();
+      if (groupName === "HV") return getHvStages().filter(s => s !== "Burn In" && !String(s).toLowerCase().includes("booster"));
+      if (groupName === "HEATRUN") return getHvStages().filter(s => s === "Burn In" || String(s).toLowerCase().includes("booster"));
+
+      return [];
+    }
+
+
+    function getLiveLog() {
+      try { return JSON.parse(localStorage.getItem("trinergyLiveLogV1") || "[]"); }
+      catch(e) { return []; }
+    }
+    function saveLiveLog(rows) {
+      localStorage.setItem("trinergyLiveLogV1", JSON.stringify(rows));
+    }
+    function addLiveLogEvent(eventType, ups, extra = {}) {
+      if (!ups) return;
+      const rows = getLiveLog();
+      const now = new Date();
+      const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      rows.push({
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        eventType,
+        serial: ups.serial,
+        type: ups.type,
+        year: now.getFullYear(),
+        month: monthNames[now.getMonth()],
+        isoWeek: "W" + String(isoWeekNumber(now)).padStart(2, "0"),
+        date: now.toISOString(),
+        everReturned: !!ups.everReturned,
+        ...extra
+      });
+      saveLiveLog(rows);
+    }
+
+    function getCurrentMonthName() {
+      return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][new Date().getMonth()];
+    }
+
+    function getAdminMonthTarget(type) {
+      const cfg = readAdminConfig();
+      const year = String(new Date().getFullYear());
+      const month = getCurrentMonthName();
+
+      let row = (cfg.monthlyTargets || []).find(r => String(r.year) === year && r.month === month);
+
+      if (!row) {
+        const oldRows = (cfg.targets || []).filter(r => String(r.year) === year && r.month === month);
+        if (oldRows.length) row = oldRows[0];
+      }
+
+      if (!row) return MONTHLY_TARGETS[type];
+
+      if (type === "T3X") return Number(row.t3x) || MONTHLY_TARGETS[type];
+      if (type === "T2X") return Number(row.t2x) || MONTHLY_TARGETS[type];
+      if (type === "TST") return Number(row.tst) || MONTHLY_TARGETS[type];
+      return MONTHLY_TARGETS[type];
+    }
+
+    function getAdminWeekTarget(type) {
+      const cfg = readAdminConfig();
+      const year = String(new Date().getFullYear());
+      const month = getCurrentMonthName();
+      const week = "W" + String(isoWeekNumber(new Date())).padStart(2, "0");
+
+      let row = (cfg.weeklyTargets || []).find(r => String(r.year) === year && r.month === month && r.week === week);
+      if (!row) row = (cfg.targets || []).find(r => String(r.year) === year && r.month === month && r.week === week);
+      if (!row) return WEEKLY_TARGETS[type];
+
+      if (type === "T3X") return Number(row.t3xWeekly ?? row.weekly) || WEEKLY_TARGETS[type];
+      if (type === "T2X") return Number(row.t2xWeekly ?? row.weekly) || WEEKLY_TARGETS[type];
+      if (type === "TST") return Number(row.tstWeekly ?? row.weekly) || WEEKLY_TARGETS[type];
+      return WEEKLY_TARGETS[type];
+    }
+
+    function getAdminTimerConfig() {
+      const cfg = readAdminConfig();
+      return cfg.timers || null;
+    }
+
+
+    const CORE_BAYS = ["CORE-21", "CORE-22", "CORE-23"];
+    const CORE_SLOTS = ["LV", "HV"];
+    const STS_BAYS = ["STS TEST", "STS HEATRUN"];
+
+    const LV_STAGES = ["LV Testing", "Hi-Pot", "Offset Compensation"];
+    const HV_STAGES = ["25% Waveforms", "Calibration", "DC Component", "Performance Test", "Short Circuit", "Data Saving", "Burn In", "Booster Burn In"];
+    const STS_TEST_STAGES = ["LV Testing", "Hi-Pot", "Offset Compensation", "25% Waveforms", "Calibration", "Performance Test", "Data Saving"];
+    const STS_HEATRUN_STAGES = ["Burn In"];
+
+    const TIMER_SETTINGS = {
+      TEST_MODE: true,
+
+      TEST_DURATIONS_MINUTES: {
+        CORE_BURN_IN: 1,
+        TST_BURN_IN: 1,
+        BOOSTER_BURN_IN: 1
+      },
+
+      REAL_DURATIONS_MINUTES: {
+        CORE_BURN_IN: 240,     // 4 hours
+        TST_BURN_IN: 60,       // 1 hour
+        BOOSTER_BURN_IN: 30    // 30 minutes
+      }
+    };
+
+    function getTimerDurationMs(timerKey) {
+      const adminTimer = getAdminTimerConfig();
+
+      if (adminTimer) {
+        const isTestMode = adminTimer.mode !== "REAL MODE";
+
+        const adminMap = isTestMode
+          ? {
+              CORE_BURN_IN: Number(adminTimer.coreTest) || TIMER_SETTINGS.TEST_DURATIONS_MINUTES.CORE_BURN_IN,
+              TST_BURN_IN: Number(adminTimer.tstTest) || TIMER_SETTINGS.TEST_DURATIONS_MINUTES.TST_BURN_IN,
+              BOOSTER_BURN_IN: Number(adminTimer.boostTest) || TIMER_SETTINGS.TEST_DURATIONS_MINUTES.BOOSTER_BURN_IN
+            }
+          : {
+              CORE_BURN_IN: Number(adminTimer.coreReal) || TIMER_SETTINGS.REAL_DURATIONS_MINUTES.CORE_BURN_IN,
+              TST_BURN_IN: Number(adminTimer.tstReal) || TIMER_SETTINGS.REAL_DURATIONS_MINUTES.TST_BURN_IN,
+              BOOSTER_BURN_IN: Number(adminTimer.boostReal) || TIMER_SETTINGS.REAL_DURATIONS_MINUTES.BOOSTER_BURN_IN
+            };
+
+        return Math.max(1, Math.round(adminMap[timerKey] || 1)) * 60 * 1000;
+      }
+
+      const source = TIMER_SETTINGS.TEST_MODE
+        ? TIMER_SETTINGS.TEST_DURATIONS_MINUTES
+        : TIMER_SETTINGS.REAL_DURATIONS_MINUTES;
+
+      return Math.max(1, Math.round(source[timerKey] || 1)) * 60 * 1000;
+    }
+
+
+    function safeAction(fn) {
+      if (isProcessing) return;
+      isProcessing = true;
+      try {
+        fn();
+      } finally {
+        setTimeout(() => { isProcessing = false; }, 300);
+      }
+    }
+
+
+    function tickClock() {
+      const now = new Date();
+      const dateEl = document.getElementById("topDate");
+      const clockEl = document.getElementById("liveClock");
+      const weekEl = document.getElementById("isoWeek");
+
+      if (dateEl) {
+        dateEl.innerText = "Date: " + now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+      }
+
+      if (clockEl) {
+        clockEl.innerText = "Time: " + now.toLocaleTimeString("en-GB");
+      }
+
+      if (weekEl) {
+        weekEl.innerText = "ISO Week: W" + String(isoWeekNumber(now)).padStart(2, "0");
+      }
+    }
+    setInterval(tickClock, 1000); tickClock();
+    setInterval(updateRunningTimers, 1000);
+
+    function isoWeekNumber(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    function generateSerial(type) {
+      const now = new Date();
+      const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const existingTypeCount = UPS_LIST.filter(u => u.type === type).map(u => Number((u.serial || "").slice(-4))).filter(n => !Number.isNaN(n));
+      const nextMain = (existingTypeCount.length ? Math.max(...existingTypeCount) : 0) + 1;
+      const mainPart = `${yyyymm}${type}${String(nextMain).padStart(4, "0")}`;
+      const week = isoWeekNumber(now);
+      const weeklyCount = UPS_LIST.filter(u => u.type === type && u.weekNo === week).length + 1;
+      const weekTag = `W${String(week).padStart(2, "0")}-${String(weeklyCount).padStart(2, "0")}`;
+      return { serial: mainPart, weekTag, weekNo: week };
+    }
+
+    function buildChecklist(type) {
+      if (type === "TST") {
+        return {
+          STS_TEST: Object.fromEntries(getStsTestStages().map(s => [s, false])),
+          STS_HEATRUN: Object.fromEntries(getStsHeatrunStages().map(s => [s, false]))
+        };
+      }
+
+      const lv = getLvStages();
+      const hvAll = getHvStages();
+
+      const hv = hvAll.filter(s => s !== "Burn In" && !String(s).toLowerCase().includes("booster"));
+      let heatrun = hvAll.filter(s => s === "Burn In" || String(s).toLowerCase().includes("booster"));
+
+      // Keep real booster count logic fixed by UPS type.
+      // Admin "Booster Burn In" acts as master enable; dashboard expands into Booster 1/2/3.
+      const boosterEnabled = heatrun.some(s => String(s).toLowerCase().includes("booster"));
+      heatrun = heatrun.filter(s => !String(s).toLowerCase().includes("booster"));
+
+      if (!heatrun.includes("Burn In")) heatrun.unshift("Burn In");
+
+      if (boosterEnabled) {
+        heatrun.push("Booster 1");
+        heatrun.push("Booster 2");
+        if (type === "T3X") heatrun.push("Booster 3");
+      }
+
+      return {
+        LV: Object.fromEntries(lv.map(s => [s, false])),
+        HV: Object.fromEntries(hv.map(s => [s, false])),
+        HEATRUN: Object.fromEntries(heatrun.map(s => [s, false]))
+      };
+    }
+
+    function addUPS() {
+      const type = document.getElementById("upsType").value;
+      if (!type) return alert("Select UPS type");
+      const s = generateSerial(type);
+      UPS_LIST.push({ id: `${type}-${Date.now()}`, type, serial: s.serial, weekTag: s.weekTag, weekNo: s.weekNo, monthKey: s.serial.slice(0, 6), locationType: "WAITING", bay: null, slot: null, stage: null, timer: null, checklist: buildChecklist(type), toFinishing: false, rework: false, tempHold: false, completedDate: null, createdAt: new Date().toISOString(), returnedAt: null, everReturned: false });
+      render();
+    }
+
+    function getUPSById(id) { return UPS_LIST.find(u => u.id === id); }
+    function selectUPS(id) { SELECTED_UPS_ID = id; render();
+      setTimeout(finalSyncStageDropdownFromChecklist, 0); }
+    function getSelectedUPS() { return getUPSById(SELECTED_UPS_ID); }
+    function isTimedRunning(ups) { return !!(ups && ups.timer && ups.timer.running); }
+    function isOccupiedCoreSlot(bay, slot, ignoreId = null) { return UPS_LIST.some(u => u.id !== ignoreId && !u.toFinishing && !u.rework && !u.tempHold && u.locationType === "CORE" && u.bay === bay && u.slot === slot); }
+    function isOccupiedSTS(bay, ignoreId = null) { return UPS_LIST.some(u => u.id !== ignoreId && !u.toFinishing && !u.rework && !u.tempHold && u.locationType === "STS" && u.bay === bay); }
+
+    function getAllowedMoveTargets(ups) {
+      if (!ups) return [];
+      if (ups.type === "TST") return [{ bay: "STS TEST", slot: "" }, { bay: "STS HEATRUN", slot: "" }];
+      const targets = [];
+      getCoreBayNames().forEach(bay => CORE_SLOTS.forEach(slot => targets.push({ bay, slot })));
+      return targets;
+    }
+
+    function updateMoveSlotOptions() {
+      const ups = getSelectedUPS();
+      const moveBay = document.getElementById("moveBay");
+      const moveSlot = document.getElementById("moveSlot");
+      if (!ups || !moveBay || !moveSlot) return;
+      const bay = moveBay.value;
+      moveSlot.innerHTML = "";
+      if (!bay) {
+        moveSlot.innerHTML = `<option value="">Select Bay first</option>`;
+        return;
+      }
+      if (ups.type === "TST" || isStsBay(bay)) {
+        moveSlot.innerHTML = `<option value="">No slot</option>`;
+        return;
+      }
+      if (isCoreBay(bay)) {
+        CORE_SLOTS.forEach(slot => {
+          const opt = document.createElement("option");
+          opt.value = slot;
+          opt.textContent = slot;
+          moveSlot.appendChild(opt);
+        });
+      }
+    }
+
+    function moveSelectedUPS() {
+      const ups = getSelectedUPS();
+      if (ups) syncChecklistWithAdminStages(ups);
+      if (!ups) return;
+      if (isTimedRunning(ups)) return alert("This UPS is locked while timed event is running");
+      const moveBay = document.getElementById("moveBay").value;
+      const moveSlot = document.getElementById("moveSlot").value;
+      if (!moveBay) return alert("Select target bay");
+
+      if (ups.type === "TST") {
+        if (isOccupiedSTS(moveBay, ups.id)) return alert("Target STS bay is occupied. Move one UPS to Temporary Holding Area if interchange is needed.");
+        ups.locationType = "STS"; ups.bay = moveBay; ups.slot = null; ups.tempHold = false; ups.rework = false;
+        if (moveBay === "STS TEST") {
+          if (!getStsTestStages().includes(ups.stage)) ups.stage = null;
+        } else if (!STS_HEATRUN_STAGES.includes(ups.stage)) ups.stage = "Burn In";
+      } else {
+        if (!moveSlot) return alert("Select target slot");
+        if (isOccupiedCoreSlot(moveBay, moveSlot, ups.id)) return alert("Target CORE slot is occupied");
+        ups.locationType = "CORE"; ups.bay = moveBay; ups.slot = moveSlot; ups.tempHold = false; ups.rework = false;
+        if (moveSlot === "LV" && !getLvStages().includes(ups.stage)) ups.stage = null;
+        if (moveSlot === "HV" && !HV_STAGES.includes(ups.stage)) ups.stage = "25% Waveforms";
+      }
+      if (ups.returnedAt) { ups.returnedAt = null; }
+      render();
+    }
+
+    
+    function moveSelectedToTempHold() {
+      const ups = getSelectedUPS();
+      if (!ups) return;
+
+      if (isTimedRunning(ups)) {
+        alert("Cannot move to Temporary Holding while timed event is running");
+        return;
+      }
+
+      ups.locationType = "TEMP";
+      ups.bay = null;
+      ups.slot = null;
+      ups.tempHold = true;
+      ups.rework = false;
+      render();
+    }
+
+
+    function isTimedStageName(stage) {
+      const s = String(stage || "").toLowerCase();
+      return s === "burn in" || s.includes("booster");
+    }
+
+    function getManualStageList(ups) {
+      return getAllowedStageList(ups).filter(stage => !isTimedStageName(stage));
+    }
+
+
+    function getAllowedStageList(ups) {
+      if (!ups) return [];
+      if (ups.type === "TST") {
+        if (ups.locationType === "STS" && isStsTestBay(ups.bay)) return getStsTestStages();
+        if (ups.locationType === "STS" && isStsHeatrunBay(ups.bay)) return getStsHeatrunStages();
+        return [];
+      }
+      if (ups.locationType === "CORE" && ups.slot === "LV") return getLvStages();
+      if (ups.locationType === "CORE" && ups.slot === "HV") {
+        let list = getHvStages().slice();
+        const hasBoosterMaster = list.some(s => String(s).toLowerCase().includes("booster"));
+        list = list.filter(s => !String(s).toLowerCase().includes("booster"));
+        if (hasBoosterMaster) {
+          list.push("Booster 1", "Booster 2");
+          if (ups.type === "T3X") list.push("Booster 3");
+        }
+        return list;
+      }
+      return [];
+    }
+
+    function markChecklistStage(ups, stage) {
+      if (ups.type === "TST") {
+        if (isStsTestBay(ups.bay) && Object.prototype.hasOwnProperty.call(ups.checklist.STS_TEST, stage)) ups.checklist.STS_TEST[stage] = true;
+        if (isStsHeatrunBay(ups.bay) && Object.prototype.hasOwnProperty.call(ups.checklist.STS_HEATRUN, stage)) ups.checklist.STS_HEATRUN[stage] = true;
+        return;
+      }
+      if (ups.slot === "LV" && Object.prototype.hasOwnProperty.call(ups.checklist.LV, stage)) ups.checklist.LV[stage] = true;
+      if (ups.slot === "HV") {
+        if (Object.prototype.hasOwnProperty.call(ups.checklist.HV, stage)) ups.checklist.HV[stage] = true;
+        if (stage === "Burn In" && Object.prototype.hasOwnProperty.call(ups.checklist.HEATRUN, "Burn In")) ups.checklist.HEATRUN["Burn In"] = true;
+        if (stage === "Booster Burn In") {
+          const pendingBooster = Object.keys(ups.checklist.HEATRUN).find(k => k.startsWith("Booster") && !ups.checklist.HEATRUN[k]);
+          if (pendingBooster) ups.checklist.HEATRUN[pendingBooster] = true;
+        }
+      }
+    }
+
+    function updateSelectedStage() {
+      const ups = getSelectedUPS();
+      if (!ups) return;
+      if (isTimedRunning(ups)) return alert("This UPS is locked while timed event is running");
+      const stage = document.getElementById("stageSelect").value;
+      if (isTimedStageName(stage)) {
+        alert("Timed events must be completed by timer. Please use Start Burn In / Start Booster button.");
+        return;
+      }
+      if (!stage) return alert("Select stage");
+      ups.stage = stage;
+      markChecklistStage(ups, stage);
+      render();
+    }
+
+    function canMarkToFinishing(ups) {
+      if (!ups || isTimedRunning(ups) || ups.rework || ups.tempHold) return false;
+      if (ups.type === "TST") return Object.values(ups.checklist.STS_TEST).every(Boolean) && Object.values(ups.checklist.STS_HEATRUN).every(Boolean);
+      return Object.values(ups.checklist.LV).every(Boolean) && Object.values(ups.checklist.HV).every(Boolean) && Object.values(ups.checklist.HEATRUN).every(Boolean);
+    }
+
+    function markToFinishing() {
+      const ups = getSelectedUPS();
+      if (!ups) return;
+      if (!canMarkToFinishing(ups)) return alert("All required tests must be completed, UPS must not be in Rework/Temporary Hold, and no timed event should be running");
+      ups.toFinishing = true;
+      ups.completedDate = new Date().toISOString();
+      addLiveLogEvent("COMPLETED", ups, { completedDate: ups.completedDate });
+      ups.locationType = "FINISHED";
+      ups.bay = null;
+      ups.slot = null;
+      ups.tempHold = false;
+      ups.rework = false;
+      SELECTED_UPS_ID = null;
+      render();
+    }
+
+    function returnToAssembly() {
+      const ups = getSelectedUPS();
+      if (!ups) return;
+      if (isTimedRunning(ups)) return alert("This UPS is locked while timed event is running");
+      ups.rework = true;
+      ups.everReturned = true;
+      ups.returnedAt = new Date().toISOString();
+      addLiveLogEvent("RTA", ups, { reason: "Return to Assembly" });
+      ups.locationType = "REWORK";
+      ups.bay = null;
+      ups.slot = null;
+      ups.tempHold = false;
+      SELECTED_UPS_ID = null;
+      render();
+    }
+
+    
+    function formatRemaining(ms) {
+      const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+
+      if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+      return `${m}m ${String(s).padStart(2, "0")}s`;
+    }
+
+    function getTimerLabel(eventKey) {
+      const labels = {
+        CORE_BURN_IN: "Burn In",
+        TST_BURN_IN: "Burn In",
+        BOOSTER_1: "Booster 1",
+        BOOSTER_2: "Booster 2",
+        BOOSTER_3: "Booster 3"
+      };
+      return labels[eventKey] || eventKey;
+    }
+
+    
+    function getShortUpsLabel(ups) {
+      const last4 = (ups.serial || "").slice(-4);
+      return `${ups.type}-${last4}`;
+    }
+
+function startTimedEvent(eventKey) {
+      const ups = getSelectedUPS();
+      if (!ups) return;
+
+      if (isTimedRunning(ups)) {
+        alert("This UPS already has a timed event running");
+        return;
+      }
+
+      if (ups.rework || ups.tempHold || ups.toFinishing) {
+        alert("Timed event can start only when UPS is in an active bay");
+        return;
+      }
+
+      if (eventKey === "TST_BURN_IN" && !(ups.type === "TST" && ups.locationType === "STS" && isStsHeatrunBay(ups.bay))) {
+        alert("TST Burn In can start only in STS HEATRUN");
+        return;
+      }
+
+      if (eventKey === "CORE_BURN_IN" && !(ups.type !== "TST" && ups.locationType === "CORE" && ups.slot === "HV")) {
+        alert("Core Burn In can start only in CORE HV slot");
+        return;
+      }
+
+      if (eventKey.startsWith("BOOSTER") && !(ups.type !== "TST" && ups.locationType === "CORE" && ups.slot === "HV")) {
+        alert("Booster can start only for T3X/T2X in CORE HV slot");
+        return;
+      }
+
+      if (eventKey === "BOOSTER_3" && ups.type !== "T3X") {
+        alert("Booster 3 is applicable only for T3X");
+        return;
+      }
+
+      const timerKey = eventKey.startsWith("BOOSTER") ? "BOOSTER_BURN_IN" : eventKey;
+      const durationMs = getTimerDurationMs(timerKey);
+      const now = Date.now();
+
+      ups.timer = {
+        running: true,
+        eventKey,
+        label: getTimerLabel(eventKey),
+        startedAt: now,
+        endsAt: now + durationMs,
+        durationMs
+      };
+
+      render();
+    }
+
+    function completeTimedEvent(ups) {
+      if (!ups || !ups.timer) return;
+
+      const eventKey = ups.timer.eventKey;
+
+      if (eventKey === "CORE_BURN_IN" || eventKey === "TST_BURN_IN") {
+        ups.stage = "Burn In";
+        if (ups.type === "TST" && ups.checklist.STS_HEATRUN) {
+          ups.checklist.STS_HEATRUN["Burn In"] = true;
+        } else if (ups.checklist.HEATRUN && Object.prototype.hasOwnProperty.call(ups.checklist.HEATRUN, "Burn In")) {
+          ups.checklist.HEATRUN["Burn In"] = true;
+        }
+      }
+
+      if (eventKey === "BOOSTER_1" && ups.checklist.HEATRUN) ups.checklist.HEATRUN["Booster 1"] = true;
+      if (eventKey === "BOOSTER_2" && ups.checklist.HEATRUN) ups.checklist.HEATRUN["Booster 2"] = true;
+      if (eventKey === "BOOSTER_3" && ups.checklist.HEATRUN) ups.checklist.HEATRUN["Booster 3"] = true;
+
+      ups.timer = null;
+    }
+
+    
+    function updateTimerDisplaysOnly() {
+      document.querySelectorAll("[data-timer-ups-id]").forEach(el => {
+        const ups = getUPSById(el.getAttribute("data-timer-ups-id"));
+        if (!ups || !ups.timer || !ups.timer.running) return;
+
+        const remaining = formatRemaining(ups.timer.endsAt - Date.now());
+        const mode = el.getAttribute("data-timer-mode");
+
+        if (mode === "panel") {
+          el.innerText = `${ups.timer.label} (${remaining})`;
+        } else if (mode === "running-line") {
+          el.innerText = `Running: ${ups.timer.label} | ${remaining} left`;
+        } else {
+          el.innerText = `${ups.timer.label}: ${remaining}`;
+        }
+      });
+    }
+
+
+    function stopTimedEventAndMarkFaulty() {
+      const ups = getSelectedUPS();
+      if (!ups || !ups.timer || !ups.timer.running) {
+        alert("No running timed event found for selected UPS");
+        return;
+      }
+
+      const msg = `Stop ${ups.timer.label} and mark ${ups.serial} as faulty / Return to Assembly?`;
+      if (!confirm(msg)) return;
+
+      ups.timer = null;
+      ups.everReturned = true;
+      ups.rework = true;
+      ups.tempHold = false;
+      ups.toFinishing = false;
+      ups.returnedAt = new Date().toISOString();
+      ups.locationType = "REWORK";
+      ups.bay = null;
+      ups.slot = null;
+      ups.stage = "Faulty / Timer Stopped";
+      addLiveLogEvent("TIMER_FAULTY", ups, { reason: "Timer stopped and marked faulty" });
+      addLiveLogEvent("RTA", ups, { reason: "Timer stopped and marked faulty" });
+      SELECTED_UPS_ID = null;
+
+      render();
+      alert("UPS marked faulty and moved to Rework Holding Area");
+    }
+
+function updateRunningTimers() {
+      let changed = false;
+      const now = Date.now();
+
+      UPS_LIST.forEach(ups => {
+        if (ups.timer && ups.timer.running && now >= ups.timer.endsAt) {
+          completeTimedEvent(ups);
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        render();
+      } else {
+        updateTimerDisplaysOnly();
+      }
+    }
+
+function renderWaitingArea() {
+      const wrap = document.getElementById("waitingArea");
+      const list = UPS_LIST.filter(u => u.locationType === "WAITING" && !u.toFinishing && !u.rework && !u.tempHold);
+      wrap.innerHTML = "";
+      if (!list.length) { wrap.innerHTML = `<div class="empty-slot">No UPS waiting for assignment</div>`; return; }
+      list.forEach(u => {
+        wrap.innerHTML += `<div class="waiting-card"><div><div class="serial">${u.serial}</div><div class="weektag">${u.weekTag}</div></div><button class="btn btn-primary" onclick="selectUPS('${u.id}')">Select</button></div>`;
+      });
+    }
+
+    function renderReworkArea() {
+      const wrap = document.getElementById("reworkArea");
+      const list = UPS_LIST.filter(u => u.rework && !u.toFinishing);
+      wrap.innerHTML = "";
+      if (!list.length) { wrap.innerHTML = `<div class="empty-slot">No UPS in rework holding area</div>`; return; }
+      list.forEach(u => {
+        wrap.innerHTML += `<div class="rework-card"><div><div class="serial">${u.serial}</div><div class="weektag">${u.weekTag}</div><span class="badge badge-rta">Rework in progress</span></div><button class="btn btn-secondary" onclick="selectUPS('${u.id}')">Select</button></div>`;
+      });
+    }
+
+    
+    function renderTempHoldArea() {
+      const wrap = document.getElementById("tempHoldArea");
+      const list = UPS_LIST.filter(u => u.tempHold && !u.toFinishing);
+
+      wrap.innerHTML = "";
+      if (!list.length) { wrap.innerHTML = `<div class="empty-slot">No UPS in temporary holding area</div>`; return; }
+
+      list.forEach(u => {
+        wrap.innerHTML += `<div class="temp-card"><div><div class="serial">${u.serial}</div><div class="weektag">${u.weekTag}</div><span class="badge badge-temp">Temporary Parking</span></div><button class="btn btn-warning" onclick="selectUPS('${u.id}')">Select</button></div>`;
+      });
+    }
+
+
+    
+    function syncChecklistWithAdminStages(ups) {
+      if (!ups || ups.toFinishing) return;
+
+      if (ups.type === "TST") {
+        ups.checklist.STS_TEST = syncChecklistObject(ups.checklist.STS_TEST || {}, getStsTestStages());
+        ups.checklist.STS_HEATRUN = syncChecklistObject(ups.checklist.STS_HEATRUN || {}, getStsHeatrunStages());
+        return;
+      }
+
+      const lv = getLvStages();
+      const hvAll = getHvStages();
+      const hv = hvAll.filter(s => s !== "Burn In" && !String(s).toLowerCase().includes("booster"));
+      let heatrun = hvAll.filter(s => s === "Burn In" || String(s).toLowerCase().includes("booster"));
+
+      const boosterEnabled = heatrun.some(s => String(s).toLowerCase().includes("booster"));
+      heatrun = heatrun.filter(s => !String(s).toLowerCase().includes("booster"));
+      if (!heatrun.includes("Burn In")) heatrun.unshift("Burn In");
+      if (boosterEnabled) {
+        heatrun.push("Booster 1");
+        heatrun.push("Booster 2");
+        if (ups.type === "T3X") heatrun.push("Booster 3");
+      }
+
+      ups.checklist.LV = syncChecklistObject(ups.checklist.LV || {}, lv);
+      ups.checklist.HV = syncChecklistObject(ups.checklist.HV || {}, hv);
+      ups.checklist.HEATRUN = syncChecklistObject(ups.checklist.HEATRUN || {}, heatrun);
+    }
+
+    function syncChecklistObject(oldObj, stageNames) {
+      const obj = {};
+      stageNames.forEach(s => obj[s] = !!oldObj[s]);
+      return obj;
+    }
+
+
+    function getProgressStats(ups) {
+      let total = 0;
+      let done = 0;
+
+      function scan(obj) {
+        Object.values(obj || {}).forEach(v => {
+          total += 1;
+          if (v) done += 1;
+        });
+      }
+
+      if (ups.type === "TST") {
+        scan(ups.checklist.STS_TEST);
+        scan(ups.checklist.STS_HEATRUN);
+      } else {
+        scan(ups.checklist.LV);
+        scan(ups.checklist.HV);
+        scan(ups.checklist.HEATRUN);
+      }
+
+      const pending = Math.max(0, total - done);
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      return { total, done, pending, pct };
+    }
+
+    function renderProgressHTML(ups) {
+      const p = getProgressStats(ups);
+      return `<div class="progress-wrap">
+        <div class="progress-text"><span>Progress: ${p.done}/${p.total} Tests Passed</span><span>${p.pct}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${p.pct}%"></div></div>
+        <div class="pending-text">Pending: ${p.pending}</div>
+      </div>`;
+    }
+
+function renderUPSCard(u) {
+      syncChecklistWithAdminStages(u);
+      const selectedClass = SELECTED_UPS_ID === u.id ? "selected" : "";
+      let timedInfo = "";
+      if (u.timer && u.timer.running) timedInfo = `<div class="badge badge-running" data-timer-ups-id="${u.id}" data-timer-mode="card">${u.timer.label}: ${formatRemaining(u.timer.endsAt - Date.now())}</div>`;
+      else if (u.type !== "TST" && u.slot === "HV") timedInfo = Object.entries(u.checklist.HEATRUN).map(([k, v]) => `<div class="tiny">${k}: ${v ? "Done" : "Pending"}</div>`).join("");
+      const rtaClass = u.everReturned || u.rework ? "rta-history" : "";
+      const rtaBadge = u.everReturned || u.rework ? `<span class="rta-badge">RTA</span>` : "";
+      return `<div class="ups-card ${selectedClass} ${rtaClass}" onclick="selectUPS('${u.id}')"><div class="serial">${u.serial}${rtaBadge}</div><div class="weektag">${u.weekTag}</div><div class="meta">Type: ${u.type}</div><div class="meta">Stage: ${u.stage || "Not Started"}</div>${timedInfo}${renderProgressHTML(u)}</div>`;
+    }
+
+    
+    
+    function getAssignableBaysForUPS(upsOrType) {
+      const type = typeof upsOrType === "string" ? upsOrType : upsOrType?.type;
+      if (type === "TST") return getStsBayNames();
+      return getCoreBayNames();
+    }
+    function fillBaySelectForUPS(selectEl, upsOrType, includePlaceholder = true) {
+      if (!selectEl) return;
+      const bays = getAssignableBaysForUPS(upsOrType);
+      selectEl.innerHTML = includePlaceholder ? `<option value="">Select Bay</option>` : "";
+      bays.forEach(bay => {
+        const opt = document.createElement("option");
+        opt.value = bay;
+        opt.textContent = bay;
+        selectEl.appendChild(opt);
+      });
+    }
+    
+    function refreshStageDropdownFromAdmin(ups) {
+      const stageSelect = document.getElementById("stageSelect");
+      if (!stageSelect || !ups) return;
+
+      const previous = stageSelect.value;
+      const stages = getManualStageList(ups);
+
+      stageSelect.innerHTML = "";
+
+      if (!stages.length) {
+        stageSelect.innerHTML = `<option value="">No manual stages available</option>`;
+        return;
+      }
+
+      stages.forEach(stage => {
+        const opt = document.createElement("option");
+        opt.value = stage;
+        opt.textContent = stage;
+        stageSelect.appendChild(opt);
+      });
+
+      if (previous && stages.includes(previous)) stageSelect.value = previous;
+    }
+
+    function refreshAssignBayDropdownFromAdmin() {
+      const upsSelect = document.getElementById("assignUPSSelect");
+      const baySelect = document.getElementById("assignBaySelect");
+      if (!upsSelect || !baySelect) return;
+      const ups = getUPSById(upsSelect.value);
+      if (!ups) {
+        baySelect.innerHTML = `<option value="">Select UPS first</option>`;
+        return;
+      }
+      fillBaySelectForUPS(baySelect, ups, true);
+    }
+    function refreshMoveBayDropdownFromAdmin(ups) {
+      const moveBay = document.getElementById("moveBay");
+      if (!moveBay || !ups) return;
+      const previous = moveBay.value;
+      fillBaySelectForUPS(moveBay, ups, true);
+      if (previous && Array.from(moveBay.options).some(o => o.value === previous)) moveBay.value = previous;
+    }
+
+    function renderBayGrid() {
+      const grid = document.getElementById("bayGrid");
+      if (!grid) return;
+
+      const coreCards = getCoreBayNames().map(bay => `
+        <div class="bay-card panel">
+          <div class="bay-head">${bay}</div>
+          <div class="slot-grid">
+            <div class="slot-card">
+              <div class="slot-head">LV SLOT</div>
+              <div id="${bay}-LV" class="slot-body"></div>
+            </div>
+            <div class="slot-card">
+              <div class="slot-head">HV SLOT</div>
+              <div id="${bay}-HV" class="slot-body"></div>
+            </div>
+          </div>
+        </div>
+      `).join("");
+
+      const stsCards = getStsBayNames().map(bay => `
+        <div class="bay-card panel">
+          <div class="bay-head">${bay}</div>
+          <div id="${bay}" class="slot-body single-slot"></div>
+        </div>
+      `).join("");
+
+      grid.innerHTML = coreCards + stsCards;
+    }
+
+function renderBaySlots() {
+      renderBayGrid();
+
+      getCoreBayNames().forEach(bay => {
+        CORE_SLOTS.forEach(slot => {
+          const el = document.getElementById(`${bay}-${slot}`);
+          if (!el) return;
+
+          const ups = UPS_LIST.find(u =>
+            !u.toFinishing &&
+            !u.rework &&
+            !u.tempHold &&
+            u.locationType === "CORE" &&
+            u.bay === bay &&
+            u.slot === slot
+          );
+
+          el.innerHTML = ups ? renderUPSCard(ups) : `<div class="empty-slot">Empty</div>`;
+        });
+      });
+
+      getStsBayNames().forEach(bay => {
+        const el = document.getElementById(bay);
+        if (!el) return;
+
+        const ups = UPS_LIST.find(u =>
+          !u.toFinishing &&
+          !u.rework &&
+          !u.tempHold &&
+          u.locationType === "STS" &&
+          u.bay === bay
+        );
+
+        el.innerHTML = ups ? renderUPSCard(ups) : `<div class="empty-slot">Empty</div>`;
+      });
+    }
+
+    function monthKeyFromIso(iso) {
+      const d = new Date(iso);
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function monthKeyNow() {
+      return monthKeyFromIso(new Date().toISOString());
+    }
+
+    function isCurrentWeek(iso) {
+      if (!iso) return false;
+      return isoWeekNumber(new Date(iso)) === isoWeekNumber(new Date());
+    }
+
+    function isToday(iso) {
+      if (!iso) return false;
+      const d = new Date(iso), n = new Date();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    }
+
+    function renderKPIs() {
+      const types = ["T3X","T2X","TST"];
+      const tbody = document.getElementById("kpiBody");
+      tbody.innerHTML = "";
+      types.forEach(type => {
+        const monthKey = monthKeyNow();
+        const weekNo = isoWeekNumber(new Date());
+        const monthReceived = UPS_LIST.filter(u => u.type === type && u.monthKey === monthKey).length;
+        const monthCompleted = UPS_LIST.filter(u => u.type === type && u.toFinishing && u.completedDate && monthKeyFromIso(u.completedDate) === monthKey).length;
+        const monthlyTarget = getAdminMonthTarget(type);
+        const weeklyTarget = getAdminWeekTarget(type);
+        const monthPending = Math.max(0, monthlyTarget - monthCompleted);
+        const weekCompleted = UPS_LIST.filter(u => u.type === type && u.toFinishing && u.completedDate && isCurrentWeek(u.completedDate)).length;
+        const weekPending = Math.max(0, weeklyTarget - weekCompleted);
+        const underTesting = UPS_LIST.filter(u => u.type === type && !u.toFinishing && !u.rework && !u.tempHold && ["CORE","STS"].includes(u.locationType)).length;
+        const rta = UPS_LIST.filter(u => u.type === type && u.rework).length;
+        const monthReceivedForFpy = UPS_LIST.filter(u => u.type === type && u.monthKey === monthKey).length;
+        const monthNoFaultForFpy = UPS_LIST.filter(u => u.type === type && u.monthKey === monthKey && !u.everReturned).length;
+        const fpy = monthReceivedForFpy ? `${Math.round((monthNoFaultForFpy / monthReceivedForFpy) * 100)}%` : "100%";
+        tbody.innerHTML += `<tr><td><b>${type}</b></td><td>${monthlyTarget}</td><td>${monthReceived}</td><td>${monthCompleted}</td><td>${monthPending}</td><td>${weeklyTarget}</td><td>${weekCompleted}</td><td>${weekPending}</td><td>${underTesting}</td><td>${rta}</td><td>${fpy}</td></tr>`;
+      });
+    }
+
+    function renderStatusBoxes() {
+      const types = ["T3X","T2X","TST"];
+      document.getElementById("activeUpsBox").innerHTML = types.map(type => {
+        const count = UPS_LIST.filter(u => u.type === type && !u.toFinishing && !u.rework && !u.tempHold && ["CORE","STS"].includes(u.locationType)).length;
+        return `<div>${type} : ${count}</div>`;
+      }).join("") + `<div><b>TOTAL: ${UPS_LIST.filter(u => !u.toFinishing && !u.rework && !u.tempHold && ["CORE","STS"].includes(u.locationType)).length}</b></div>`;
+
+      const running = UPS_LIST.filter(u => u.timer && u.timer.running);
+      if (running.length) {
+        document.getElementById("timedEventsBox").innerHTML =
+          running.map(u => `<div>${getShortUpsLabel(u)} ${u.timer.label}</div>`).join("") +
+          `<div><b>TOTAL: ${running.length}</b></div>`;
+      } else {
+        document.getElementById("timedEventsBox").innerHTML = `<div>No timed events running</div>`;
+      }
+
+      document.getElementById("completedTodayBox").innerHTML = types.map(type => {
+        const count = UPS_LIST.filter(u => u.type === type && u.toFinishing && isToday(u.completedDate)).length;
+        return `<div>${type} : ${count}</div>`;
+      }).join("") + `<div><b>TOTAL: ${UPS_LIST.filter(u => u.toFinishing && isToday(u.completedDate)).length}</b></div>`;
+    }
+
+    
+    function moveSelectedToTempHold() {
+      const ups = getSelectedUPS();
+      if (!ups) return;
+
+      if (isTimedRunning(ups)) {
+        alert("Cannot move to Temporary Holding while timed event is running");
+        return;
+      }
+
+      ups.locationType = "TEMP";
+      ups.bay = null;
+      ups.slot = null;
+      ups.tempHold = true;
+      ups.rework = false;
+      render();
+    }
+
+
+    function isTimedStageName(stage) {
+      const s = String(stage || "").toLowerCase();
+      return s === "burn in" || s.includes("booster");
+    }
+
+    function getManualStageList(ups) {
+      return getAllowedStageList(ups).filter(stage => !isTimedStageName(stage));
+    }
+
+
+    function getAllowedStageList(ups) {
+      if (!ups) return [];
+      if (ups.type === "TST") {
+        if (ups.locationType === "STS" && isStsTestBay(ups.bay)) return STS_TEST_STAGES;
+        if (ups.locationType === "STS" && isStsHeatrunBay(ups.bay)) return STS_HEATRUN_STAGES;
+        return [];
+      }
+      if (ups.locationType === "CORE" && ups.slot === "LV") return LV_STAGES;
+      if (ups.locationType === "CORE" && ups.slot === "HV") return HV_STAGES;
+      return [];
+    }
+
+    function renderChecklistHTML(ups) {
+      function block(title, obj) {
+        const rows = Object.entries(obj).map(([k,v]) => `<div class="check-row"><span>${k}</span><span>${v ? "✔" : "❌"}</span></div>`).join("");
+        return `<div class="check-group"><b>${title}</b>${rows}</div>`;
+      }
+      if (ups.type === "TST") return block("STS TEST", ups.checklist.STS_TEST) + block("STS HEATRUN", ups.checklist.STS_HEATRUN);
+      return block("LV", ups.checklist.LV) + block("HV", ups.checklist.HV) + block("HEATRUN", ups.checklist.HEATRUN);
+    }
+
+    
+    function applyTimedLockUI(ups) {
+      const locked = isTimedRunning(ups);
+
+      const moveBay = document.getElementById("moveBay");
+      const moveSlot = document.getElementById("moveSlot");
+      const stageSelect = document.getElementById("stageSelect");
+      const tempBtn = document.getElementById("tempHoldBtn");
+      const finishBtn = document.getElementById("toFinishingBtn");
+
+      if (moveBay) moveBay.disabled = locked;
+      if (moveSlot) moveSlot.disabled = locked || ups.type === "TST";
+      if (stageSelect) stageSelect.disabled = locked;
+      if (tempBtn) tempBtn.disabled = locked;
+      if (finishBtn) finishBtn.disabled = locked || !canMarkToFinishing(ups);
+
+      const moveSection = document.getElementById("moveSection");
+      const stageSection = document.getElementById("stageSection");
+      const finalSection = document.getElementById("finalSection");
+
+      if (moveSection) moveSection.classList.toggle("locked-control", locked);
+      if (stageSection) stageSection.classList.toggle("locked-control", locked);
+      if (finalSection) finalSection.classList.toggle("locked-control", locked);
+
+      if (locked && moveBay) {
+        moveBay.innerHTML = `<option>${ups.bay || "Locked"}</option>`;
+      }
+      if (locked && moveSlot) {
+        moveSlot.innerHTML = `<option>${ups.slot || "No Slot"}</option>`;
+      }
+    }
+
+
+    function finalSyncStageDropdownFromChecklist() {
+      const ups = getSelectedUPS();
+      const stageSelect = document.getElementById("stageSelect");
+      if (!ups || !stageSelect) return;
+
+      syncChecklistWithAdminStages(ups);
+
+      let stages = [];
+
+      if (ups.type === "TST") {
+        if (ups.locationType === "STS" && isStsTestBay(ups.bay)) stages = Object.keys(ups.checklist.STS_TEST || {});
+        if (ups.locationType === "STS" && isStsHeatrunBay(ups.bay)) stages = Object.keys(ups.checklist.STS_HEATRUN || {});
+      } else {
+        if (ups.locationType === "CORE" && ups.slot === "LV") stages = Object.keys(ups.checklist.LV || {});
+        if (ups.locationType === "CORE" && ups.slot === "HV") {
+          stages = [
+            ...Object.keys(ups.checklist.HV || {}),
+            ...Object.keys(ups.checklist.HEATRUN || {})
+          ];
+        }
+      }
+
+      stages = stages.filter(stage => !isTimedStageName(stage));
+
+      const previous = stageSelect.value;
+      stageSelect.innerHTML = "";
+
+      if (!stages.length) {
+        stageSelect.innerHTML = `<option value="">No manual stages available</option>`;
+        return;
+      }
+
+      stages.forEach(stage => {
+        const opt = document.createElement("option");
+        opt.value = stage;
+        opt.textContent = stage;
+        stageSelect.appendChild(opt);
+      });
+
+      if (previous && stages.includes(previous)) {
+        stageSelect.value = previous;
+      }
+    }
+
+
+    function renderActionPanel() {
+      const ups = getSelectedUPS();
+      const noSel = document.getElementById("noSelection");
+      const panel = document.getElementById("actionPanel");
+      if (!ups) { noSel.classList.remove("hidden"); panel.classList.add("hidden"); return; }
+      noSel.classList.add("hidden"); panel.classList.remove("hidden");
+
+      const previousMoveBay = document.getElementById("moveBay") ? document.getElementById("moveBay").value : "";
+      const previousMoveSlot = document.getElementById("moveSlot") ? document.getElementById("moveSlot").value : "";
+
+      const locationText = ups.locationType === "WAITING" ? "Waiting for Assignment" : ups.locationType === "REWORK" ? "Rework Holding Area" : ups.locationType === "TEMP" ? "Temporary Holding Area" : ups.locationType === "CORE" ? `${ups.bay} ${ups.slot}` : ups.locationType === "STS" ? ups.bay : "Finished";
+      document.getElementById("selectedDetails").innerHTML = `<div class="detail-item"><b>UPS ID</b><br>${ups.serial}</div><div class="detail-item"><b>Week Tag</b><br>${ups.weekTag}</div><div class="detail-item"><b>Type</b><br>${ups.type}</div><div class="detail-item"><b>Location</b><br>${locationText}</div><div class="detail-item"><b>Current Stage</b><br>${ups.stage || "Not Started"}</div><div class="detail-item"><b>Timer</b><br>${ups.timer && ups.timer.running ? `<span data-timer-ups-id="${ups.id}" data-timer-mode="panel">${ups.timer.label} (${formatRemaining(ups.timer.endsAt - Date.now())})</span>` : "None"}</div>`;
+
+      const moveBay = document.getElementById("moveBay");
+      moveBay.innerHTML = "";
+      getAllowedMoveTargets(ups).forEach(target => {
+        if (!moveBay.querySelector(`option[value="${target.bay}"]`)) moveBay.innerHTML += `<option value="${target.bay}">${target.bay}</option>`;
+      });
+      refreshMoveBayDropdownFromAdmin(ups);
+      updateMoveSlotOptions();
+      refreshStageDropdownFromAdmin(ups);
+
+      if (previousMoveBay && Array.from(moveBay.options).some(o => o.value === previousMoveBay)) {
+        moveBay.value = previousMoveBay;
+        updateMoveSlotOptions();
+      }
+      const moveSlotEl = document.getElementById("moveSlot");
+      if (previousMoveSlot && moveSlotEl && Array.from(moveSlotEl.options).some(o => o.value === previousMoveSlot)) {
+        moveSlotEl.value = previousMoveSlot;
+      }
+
+      const stageSelect = document.getElementById("stageSelect");
+      const stages = getAllowedStageList(ups);
+      stageSelect.innerHTML = "";
+      if (stages.length) {
+        stages.forEach(s => { stageSelect.innerHTML += `<option value="${s}">${s}</option>`; });
+        if (ups.stage && stages.includes(ups.stage)) stageSelect.value = ups.stage;
+      } else stageSelect.innerHTML = `<option value="">No stages available</option>`;
+      stageSelect.disabled = isTimedRunning(ups);
+
+
+      const timedWrap = document.getElementById("timedActionButtons");
+      let buttons = [];
+      const locked = isTimedRunning(ups);
+      const disabled = locked ? "disabled" : "";
+
+      if (locked && ups.timer) {
+        const remaining = formatRemaining(ups.timer.endsAt - Date.now());
+        buttons.push(`<div class="timer-line" data-timer-ups-id="${ups.id}" data-timer-mode="running-line">Running: ${ups.timer.label} | ${remaining} left</div>`);
+      }
+
+      if (ups.type === "TST" && ups.locationType === "STS" && isStsHeatrunBay(ups.bay)) {
+        buttons.push(`<button class="btn btn-secondary" ${disabled} onclick="safeAction(() => startTimedEvent('TST_BURN_IN'))">Start Burn In</button>`);
+      }
+
+      if ((ups.type === "T3X" || ups.type === "T2X") && ups.locationType === "CORE" && ups.slot === "HV") {
+        buttons.push(`<button class="btn btn-secondary" ${disabled} onclick="safeAction(() => startTimedEvent('CORE_BURN_IN'))">Start Burn In</button>`);
+        buttons.push(`<button class="btn btn-secondary" ${disabled} onclick="safeAction(() => startTimedEvent('BOOSTER_1'))">Start Booster 1</button>`);
+        buttons.push(`<button class="btn btn-secondary" ${disabled} onclick="safeAction(() => startTimedEvent('BOOSTER_2'))">Start Booster 2</button>`);
+        if (ups.type === "T3X") buttons.push(`<button class="btn btn-secondary" ${disabled} onclick="safeAction(() => startTimedEvent('BOOSTER_3'))">Start Booster 3</button>`);
+      }
+
+      if (locked) {
+        buttons.push(`<button class="btn btn-danger" onclick="safeAction(stopTimedEventAndMarkFaulty)">Stop Timer & Mark Faulty</button>`);
+        buttons.push(`<div class="locked-note">This UPS is locked during timed event. Other UPS/bays remain free.</div>`);
+      }
+
+      timedWrap.innerHTML = buttons.length ? buttons.join("") : `<div class="muted tiny">No timed events applicable here</div>`;
+      document.getElementById("progressChecklist").innerHTML = renderChecklistHTML(ups);
+      document.getElementById("toFinishingBtn").disabled = !canMarkToFinishing(ups);
+      document.getElementById("tempHoldBtn").style.display = "inline-block";
+      applyTimedLockUI(ups);
+    
+      finalSyncStageDropdownFromChecklist();
+    }
+
+    function render() {
+      renderKPIs(); renderStatusBoxes(); renderWaitingArea(); renderReworkArea(); renderTempHoldArea(); renderBaySlots();
+      refreshAssignBayDropdownFromAdmin(); renderActionPanel();
+    }
+
+    
+    window.addEventListener("storage", function(event) {
+      if (event.key === "trinergyAdminV3") {
+        render();
+        finalSyncStageDropdownFromChecklist();
+        console.log("Admin configuration updated. Dashboard refreshed automatically.");
+      }
+    });
+
+    function notifyAdminSyncIfSameTabNeeded() {
+      render();
+    }
+
+render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Trinergy Admin Control Panel v4.2</title>
+<style>
+:root{--bg:#0b1220;--panel:#15223b;--border:#334b75;--text:#eef5ff;--muted:#a8bad8;--accent:#ff4d4d}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;background:#111f3b;border-bottom:3px solid var(--accent);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:16px}.logo{width:120px;height:48px;background:#ff6a00;color:white;display:flex;align-items:center;justify-content:center;font-weight:900;border-radius:4px}
+.title{font-size:24px;font-weight:900}.subtitle{font-size:13px;color:var(--muted);margin-top:4px}
+.top-info{background:#1a2845;border:1px solid var(--border);padding:10px 14px;border-radius:12px;font-weight:800;font-size:13px;line-height:1.6;min-width:220px}
+.page{padding:20px}.nav{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.tab{background:#1a2845;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:999px;cursor:pointer;font-weight:800}.tab.active{background:#c62828;border-color:#ff6b6b}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+h2,h3{margin:0 0 12px}h2:after,h3:after{content:"";display:block;width:48px;height:3px;background:var(--accent);border-radius:999px;margin-top:8px}
+.hint{color:var(--muted);margin-bottom:14px;font-size:13px}.table-scroll{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:820px}th,td{border:1px solid var(--border);padding:10px 12px;text-align:center}
+th{background:#c62828;color:white;font-weight:900}td{background:#15223b}td[contenteditable="true"]{background:#0f1a2f;outline:1px dashed rgba(168,186,216,.35)}
+.form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+label{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+input,select{width:100%;margin-top:6px;padding:10px;background:#0f1a2f;color:var(--text);border:1px solid var(--border);border-radius:10px;font-size:14px}
+select.inline-select{margin:0;min-width:130px}
+.button-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}button{border:0;border-radius:10px;padding:11px 14px;font-weight:900;color:white;cursor:pointer;background:#1c5cc8}
+button.secondary{background:#51408d}button.warning{background:#b0761f}button.danger{background:#b73131}button.success{background:#1d7d49}
+button.category.active{background:#c62828;border:1px solid #ff6b6b}
+.mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.mini-card{background:linear-gradient(135deg,#17233b,#1f2f4f);border:1px solid var(--border);border-radius:14px;padding:14px}
+.mini-title{color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:900;letter-spacing:.08em}.mini-value{font-size:22px;font-weight:900;margin-top:8px}.mini-sub{color:var(--muted);font-size:12px;margin-top:4px}
+.tab-content{display:none}.tab-content.active{display:block}
+.toast{position:fixed;right:20px;bottom:20px;background:#1d7d49;color:white;padding:12px 16px;border-radius:12px;font-weight:900;display:none;z-index:99}
+.chart-box{height:240px;border:1px dashed rgba(168,186,216,.45);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:800;background:#0f1a2f;margin-top:12px;text-align:center;padding:20px}
+.login-overlay{position:fixed;inset:0;background:rgba(5,10,20,.96);z-index:999;display:flex;align-items:center;justify-content:center}
+.login-card{width:min(420px,92vw);background:#15223b;border:1px solid #334b75;border-radius:18px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.45)}
+.login-card h2{margin:0 0 10px}.login-card p{color:#a8bad8;margin:0 0 14px}.login-card button{margin-top:12px;width:100%}
+.login-error{color:#ff9a9a;font-weight:800;margin-top:10px;display:none}
+@media(max-width:1000px){.form-grid,.mini-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.form-grid,.mini-grid{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start;gap:12px}}
+</style>
+</head>
+<body>
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h2>Admin Login</h2>
+    <p>Enter admin password to access configuration page.</p>
+    <input id="adminPasswordInput" type="password" placeholder="Admin Password" onkeydown="if(event.key==='Enter') checkAdminPassword()">
+    <button class="success" onclick="checkAdminPassword()">Unlock Admin</button>
+    <div class="login-error" id="loginError">Wrong password</div>
+    <p style="font-size:12px;margin-top:14px;">Default password: <b>admin123</b></p>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand"><div class="logo">VERTIV</div><div><div class="title">TRINERGY ADMIN CONTROL PANEL</div><div class="subtitle">Clean Connected Admin v4.2</div></div></div>
+  <div class="top-info"><div>Date: <span id="dateText">--</span></div><div>Time: <span id="timeText">--</span></div><div>ISO Week: <span id="weekText">--</span></div></div>
+</header>
+
+<main class="page">
+<section class="mini-grid">
+  <div class="mini-card"><div class="mini-title">Dashboard Status</div><div class="mini-value">Locked</div><div class="mini-sub">Front page untouched</div></div>
+  <div class="mini-card"><div class="mini-title">Admin Mode</div><div class="mini-value">Local</div><div class="mini-sub">Saved in browser</div></div>
+  <div class="mini-card"><div class="mini-title">Target Rows</div><div class="mini-value" id="targetCount">0</div><div class="mini-sub">Monthly + weekly</div></div>
+  <div class="mini-card"><div class="mini-title">Masters</div><div class="mini-value">Ready</div><div class="mini-sub">Bays and stages</div></div>
+</section>
+
+<nav class="nav">
+  <button class="tab active" onclick="showTab('targets', this)">Targets</button>
+  <button class="tab" onclick="showTab('historical', this)">Historical Data</button>
+  <button class="tab" onclick="showTab('timers', this)">Timers</button>
+  <button class="tab" onclick="showTab('bays', this)">Test Bays</button>
+  <button class="tab" onclick="showTab('stages', this)">Stages</button>
+  <button class="tab" onclick="showTab('serials', this)">Serials</button>
+  <button class="tab" onclick="showTab('oldserial', this)">Old Serial Re-entry</button>
+  <button class="tab" onclick="showTab('reports', this)">Reports</button>
+</nav>
+
+<section id="targets" class="tab-content active">
+  <div class="panel">
+    <h2>Monthly Targets</h2>
+    <div class="hint">Monthly Target month-level hota hai. Weekly target change karne se Monthly Target affect nahi hoga.</div>
+    <div class="form-grid">
+      <div><label>Year</label><select id="monthlyTargetYear"></select></div>
+      <div><label>Month</label><select id="monthlyTargetMonth"></select></div>
+      <div><label>Status</label><select id="monthlyTargetStatus"><option>Open</option><option>Locked</option></select></div>
+      <div><label>T3X Monthly Target</label><input id="monthlyT3X" type="number" value="20"></div>
+      <div><label>T2X Monthly Target</label><input id="monthlyT2X" type="number" value="15"></div>
+      <div><label>TST Monthly Target</label><input id="monthlyTST" type="number" value="10"></div>
+    </div>
+    <div class="button-row"><button class="success" onclick="saveMonthlyTarget()">Save Monthly Target</button><button class="warning" onclick="lockMonthlyTarget()">Lock Month</button><button class="danger" onclick="clearMonthlyTargets()">Clear Monthly</button></div>
+    <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Year</th><th>Month</th><th>T3X Monthly</th><th>T2X Monthly</th><th>TST Monthly</th><th>Status</th></tr></thead><tbody id="monthlyTargetBody"></tbody></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Weekly Targets</h2>
+    <div class="hint">Weekly Target ISO week-wise aur type-wise alag set hoga.</div>
+    <div class="form-grid">
+      <div><label>Year</label><select id="weeklyTargetYear" onchange="populateWeeklyWeeks()"></select></div>
+      <div><label>Month</label><select id="weeklyTargetMonth" onchange="populateWeeklyWeeks()"></select></div>
+      <div><label>ISO Week</label><select id="weeklyTargetWeek"></select></div>
+      <div><label>Status</label><select id="weeklyTargetStatus"><option>Open</option><option>Locked</option></select></div>
+      <div><label>T3X Weekly Target</label><input id="weeklyT3X" type="number" value="5"></div>
+      <div><label>T2X Weekly Target</label><input id="weeklyT2X" type="number" value="4"></div>
+      <div><label>TST Weekly Target</label><input id="weeklyTST" type="number" value="3"></div>
+    </div>
+    <div class="button-row"><button class="success" onclick="saveWeeklyTarget()">Save Weekly Target</button><button class="warning" onclick="lockWeeklyTarget()">Lock Week</button><button class="danger" onclick="clearWeeklyTargets()">Clear Weekly</button></div>
+    <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Year</th><th>Month</th><th>ISO Week</th><th>T3X Weekly</th><th>T2X Weekly</th><th>TST Weekly</th><th>Status</th></tr></thead><tbody id="weeklyTargetBody"></tbody></table></div>
+  </div>
+</section>
+
+<section id="historical" class="tab-content"><div class="panel">
+  <h2>Historical Data Entry</h2><div class="hint">Selected category red highlight hoga. Click cell → type value → Save Historical Data.</div>
+  <div class="button-row">
+    <button class="secondary category" id="catTarget" onclick="setHistCategory('Target')">Target</button>
+    <button class="secondary category" id="catReceived" onclick="setHistCategory('Received')">Received</button>
+    <button class="secondary category" id="catCompleted" onclick="setHistCategory('Completed')">Completed</button>
+    <button class="secondary category" id="catRTA" onclick="setHistCategory('RTA')">RTA</button>
+    <button class="secondary category" id="catFPY" onclick="setHistCategory('FPY')">FPY %</button>
+  </div>
+  <div class="hint" id="histCategoryLabel" style="margin-top:12px">Current Category: Target</div>
+  <div class="table-scroll"><table><thead><tr><th>Year</th><th>Month</th><th>T3X</th><th>T2X</th><th>TST</th><th>Total</th></tr></thead><tbody id="histBody"></tbody></table></div>
+  <div class="button-row"><button class="success" onclick="saveHistorical()">Save Historical Data</button><button class="warning" onclick="lockHistorical()">Lock Year/Month</button><button class="danger" onclick="clearHistorical()">Clear Historical</button></div>
+</div></section>
+
+<section id="timers" class="tab-content"><div class="panel">
+  <h2>Timer Settings</h2><div class="hint">Whole minutes only. Dashboard reads this before timer start.</div>
+  <div class="form-grid">
+    <div><label>Mode</label><select id="timerMode"><option>TEST MODE</option><option>REAL MODE</option></select></div>
+    <div><label>Core Burn Test Min</label><input id="coreTest" type="number" min="1" step="1" value="1"></div>
+    <div><label>TST Burn Test Min</label><input id="tstTest" type="number" min="1" step="1" value="1"></div>
+    <div><label>Booster Test Min</label><input id="boostTest" type="number" min="1" step="1" value="1"></div>
+    <div><label>Core Burn Real Min</label><input id="coreReal" type="number" min="1" step="1" value="240"></div>
+    <div><label>TST Burn Real Min</label><input id="tstReal" type="number" min="1" step="1" value="60"></div>
+    <div><label>Booster Real Min</label><input id="boostReal" type="number" min="1" step="1" value="30"></div>
+  </div>
+  <div class="button-row"><button class="success" onclick="saveTimers()">Save Timer Settings</button></div>
+</div></section>
+
+<section id="bays" class="tab-content"><div class="panel">
+  <h2>Test Bay Management</h2><div class="hint">Only bay name manual. Bay type decides sections + UPS applicability. Disable per-row dropdown se karo.</div>
+  <div class="form-grid">
+    <div><label>New Bay Name</label><input id="bayName" placeholder="CORE-24"></div>
+    <div><label>Bay Type / Role</label><select id="bayType" onchange="updateBayRoleInfo()"><option>CORE</option><option>STS TEST</option><option>STS HEATRUN</option></select></div>
+    <div><label>Auto Sections</label><input id="baySectionsPreview" disabled></div>
+    <div><label>Applicable UPS</label><input id="bayUpsPreview" disabled></div>
+  </div>
+  <div class="button-row"><button class="success" onclick="addBay()">Add Bay</button><button class="success" onclick="saveBayMaster()">Save Bay Master</button></div>
+  <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Bay Name</th><th>Bay Type / Role</th><th>Sections</th><th>Applicable UPS</th><th>Status</th></tr></thead><tbody id="bayBody"></tbody></table></div>
+</div></section>
+
+<section id="stages" class="tab-content"><div class="panel">
+  <h2>Stage Management</h2><div class="hint">Stage group select karo. Disable master table ke status dropdown se karo.</div>
+  <div class="form-grid">
+    <div><label>Stage Group</label><select id="stageGroup" onchange="updateStageGroupInfo()"><option>LV</option><option>HV</option><option>STS TEST</option><option>STS HEATRUN</option></select></div>
+    <div><label>Applicable UPS</label><input id="stageUpsPreview" disabled></div>
+    <div><label>Stage Name</label><input id="stageName" placeholder="New Stage"></div>
+    <div><label>Order</label><input id="stageOrder" type="number" value="1"></div>
+  </div>
+  <div class="button-row"><button class="success" onclick="addStage()">Add Stage</button><button class="success" onclick="saveStageMaster()">Save Stage Master</button></div>
+  <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Stage Group</th><th>Applicable UPS</th><th>Stage Name</th><th>Order</th><th>Status</th></tr></thead><tbody id="stageBody"></tbody></table></div>
+</div></section>
+
+<section id="serials" class="tab-content"><div class="panel">
+  <h2>Serial Settings</h2><div class="hint">Counter save works locally.</div>
+  <div class="form-grid"><div><label>Type</label><select id="serialType"><option>T3X</option><option>T2X</option><option>TST</option></select></div><div><label>Current Counter</label><input id="serialCounter" type="number" value="42"></div><div><label>Admin Password</label><input type="password"></div></div>
+  <div class="button-row"><button class="success" onclick="saveSerial()">Save Counter</button></div>
+  <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Type</th><th>Current Counter</th><th>Next Serial</th></tr></thead><tbody id="serialBody"></tbody></table></div>
+</div></section>
+
+<section id="oldserial" class="tab-content"><div class="panel">
+  <h2>Old Serial Re-entry</h2><div class="hint">Old serial add hoga without increasing new serial counter.</div>
+  <div class="form-grid"><div><label>Old Serial Number</label><input id="oldSerialNo" placeholder="202604T3X0031"></div><div><label>UPS Type</label><select id="oldType"><option>T3X</option><option>T2X</option><option>TST</option></select></div><div><label>Reason</label><select id="oldReason"><option>Retest</option><option>Rework</option><option>Customer Hold</option></select></div><div><label>Initial Location</label><select id="oldLocation"><option>Waiting</option><option>RTA</option><option>Temporary Hold</option></select></div></div>
+  <div class="button-row"><button class="success" onclick="addOldSerial()">Add Old Serial</button></div>
+  <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Old Serial</th><th>Type</th><th>Reason</th><th>Initial Location</th></tr></thead><tbody id="oldBody"></tbody></table></div>
+</div></section>
+
+
+<section id="reports" class="tab-content"><div class="panel">
+  <h2>Reports & Trends</h2>
+  <div class="hint">Historical Manual Data + Live Dashboard Log combine hoke trends banenge.</div>
+  <div class="form-grid">
+    <div><label>Year</label><select id="reportYear" onchange="renderReport()"></select></div>
+    <div><label>UPS Type</label><select id="reportType" onchange="renderReport()"><option>All</option><option>T3X</option><option>T2X</option><option>TST</option></select></div>
+    <div><label>Chart</label><select id="reportChart" onchange="renderReport()"><option>Completed Trend</option><option>FPY Trend</option><option>Completed vs FPY</option><option>RTA Trend</option></select></div>
+    <div><label>Data Source</label><select id="reportSource" onchange="renderReport()"><option>Historical + Live</option><option>Historical Only</option><option>Live Only</option></select></div>
+  </div>
+  <div class="button-row">
+    <button class="success" onclick="renderReport()">Generate Report</button>
+    <button class="secondary" onclick="clearLiveLog()">Clear Live Log</button>
+  </div>
+  <section class="mini-grid" style="margin-top:16px">
+    <div class="mini-card"><div class="mini-title">Completed</div><div class="mini-value" id="repCompleted">0</div><div class="mini-sub">selected year/type</div></div>
+    <div class="mini-card"><div class="mini-title">RTA / Fault</div><div class="mini-value" id="repRta">0</div><div class="mini-sub">quality loss</div></div>
+    <div class="mini-card"><div class="mini-title">FPY</div><div class="mini-value" id="repFpy">100%</div><div class="mini-sub">completed basis</div></div>
+    <div class="mini-card"><div class="mini-title">Live Logs</div><div class="mini-value" id="repLiveRows">0</div><div class="mini-sub">dashboard generated</div></div>
+  </section>
+  <div class="chart-box" style="height:auto;display:block;text-align:left;">
+    <canvas id="reportCanvas" width="1100" height="420" style="width:100%;max-width:1100px;background:#0f1a2f;border-radius:14px;"></canvas>
+  </div>
+  <div class="table-scroll" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Month</th><th>T3X Completed</th><th>T2X Completed</th><th>TST Completed</th><th>Total Completed</th><th>RTA/Fault</th><th>FPY %</th></tr></thead>
+      <tbody id="reportTableBody"></tbody>
+    </table>
+  </div>
+</div></section>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const ADMIN_PASSWORD="admin123";
+function checkAdminPassword(){const i=document.getElementById("adminPasswordInput"),e=document.getElementById("loginError");if(i.value===ADMIN_PASSWORD){sessionStorage.setItem("trinergyAdminUnlocked","yes");document.getElementById("loginOverlay").style.display="none"}else e.style.display="block"}
+function applyAdminLock(){if(sessionStorage.getItem("trinergyAdminUnlocked")==="yes")document.getElementById("loginOverlay").style.display="none"}
+
+const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const bayRoleMap={CORE:{sections:"LV + HV",ups:"T3X / T2X",role:"CORE"},"STS TEST":{sections:"Single",ups:"TST",role:"STS TEST"},"STS HEATRUN":{sections:"Single",ups:"TST",role:"STS HEATRUN"}};
+const stageGroupMap={LV:{ups:"T3X / T2X"},HV:{ups:"T3X / T2X"},"STS TEST":{ups:"TST"},"STS HEATRUN":{ups:"TST"}};
+
+let state=JSON.parse(localStorage.getItem("trinergyAdminV3")||"{}");
+state.targets=state.targets||[];
+state.monthlyTargets=state.monthlyTargets||[];
+state.weeklyTargets=state.weeklyTargets||[];
+state.hist=state.hist||{};
+state.histCategory=state.histCategory||"Target";
+state.bays=state.bays||[
+ {name:"CORE-21",type:"CORE",sections:"LV + HV",ups:"T3X / T2X",status:"Active"},
+ {name:"CORE-22",type:"CORE",sections:"LV + HV",ups:"T3X / T2X",status:"Active"},
+ {name:"CORE-23",type:"CORE",sections:"LV + HV",ups:"T3X / T2X",status:"Active"},
+ {name:"STS TEST",type:"STS TEST",sections:"Single",ups:"TST",status:"Active"},
+ {name:"STS HEATRUN",type:"STS HEATRUN",sections:"Single",ups:"TST",status:"Active"}
+];
+state.stages=state.stages||[
+ {group:"LV",ups:"T3X / T2X",name:"LV Testing",order:1,status:"Active"},
+ {group:"LV",ups:"T3X / T2X",name:"Hi-Pot",order:2,status:"Active"},
+ {group:"LV",ups:"T3X / T2X",name:"Offset Compensation",order:3,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"25% Waveforms",order:1,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"Calibration",order:2,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"DC Component",order:3,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"Performance Test",order:4,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"Short Circuit",order:5,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"Data Saving",order:6,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"Burn In",order:7,status:"Active"},
+ {group:"HV",ups:"T3X / T2X",name:"Booster Burn In",order:8,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"LV Testing",order:1,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"Hi-Pot",order:2,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"Offset Compensation",order:3,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"25% Waveforms",order:4,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"Calibration",order:5,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"Performance Test",order:6,status:"Active"},
+ {group:"STS TEST",ups:"TST",name:"Data Saving",order:7,status:"Active"},
+ {group:"STS HEATRUN",ups:"TST",name:"Burn In",order:1,status:"Active"}
+];
+state.serials=state.serials||{T3X:42,T2X:18,TST:9};
+state.oldSerials=state.oldSerials||[];
+state.timers=state.timers||{mode:"TEST MODE",coreTest:1,tstTest:1,boostTest:1,coreReal:240,tstReal:60,boostReal:30};
+
+if(state.targets.length && !state.monthlyTargets.length && !state.weeklyTargets.length){
+  state.targets.forEach(r=>{
+    if(!state.monthlyTargets.some(m=>m.year==r.year&&m.month==r.month))state.monthlyTargets.push({year:r.year,month:r.month,t3x:r.t3x,t2x:r.t2x,tst:r.tst,status:r.status||"Open"});
+    state.weeklyTargets.push({year:r.year,month:r.month,week:r.week,t3xWeekly:r.t3xWeekly??r.weekly??5,t2xWeekly:r.t2xWeekly??r.weekly??4,tstWeekly:r.tstWeekly??r.weekly??3,status:r.status||"Open"});
+  });
+}
+
+function save(){localStorage.setItem("trinergyAdminV3",JSON.stringify(state))}
+function toast(msg){const t=document.getElementById("toast");t.innerText=msg;t.style.display="block";setTimeout(()=>t.style.display="none",1800)}
+function isoWeekNumber(date){const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));const dayNum=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-dayNum);const yStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil((((d-yStart)/86400000)+1)/7)}
+function tickClock(){const n=new Date();dateText.innerText=n.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});timeText.innerText=n.toLocaleTimeString("en-GB");weekText.innerText="W"+String(isoWeekNumber(n)).padStart(2,"0")}
+setInterval(tickClock,1000);tickClock();
+function showTab(id,btn){document.querySelectorAll(".tab-content").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");btn.classList.add("active")}
+
+function fillSelect(el,options,value){el.innerHTML="";options.forEach(o=>{const opt=document.createElement("option");if(typeof o==="object"){opt.value=o.value;opt.textContent=o.label}else{opt.value=o;opt.textContent=o}el.appendChild(opt)});if(value!==undefined)el.value=String(value)}
+function getIsoWeeksForMonth(year,month){const set=new Set(),d=new Date(year,month-1,1);while(d.getMonth()==month-1){set.add(isoWeekNumber(d));d.setDate(d.getDate()+1)}return [...set].sort((a,b)=>a-b)}
+function initDropdowns(){const y=new Date().getFullYear(),m=new Date().getMonth()+1,years=[];for(let i=2024;i<=2032;i++)years.push(String(i));const mo=months.map((x,i)=>({value:String(i+1),label:x}));fillSelect(monthlyTargetYear,years,y);fillSelect(weeklyTargetYear,years,y);fillSelect(monthlyTargetMonth,mo,m);fillSelect(weeklyTargetMonth,mo,m);populateWeeklyWeeks();updateBayRoleInfo();updateStageGroupInfo()}
+function populateWeeklyWeeks(){const y=+weeklyTargetYear.value,m=+weeklyTargetMonth.value;weeklyTargetWeek.innerHTML="";getIsoWeeksForMonth(y,m).forEach(w=>weeklyTargetWeek.innerHTML+=`<option>W${String(w).padStart(2,"0")}</option>`)}
+
+function saveMonthlyTarget(){const row={year:monthlyTargetYear.value,month:months[+monthlyTargetMonth.value-1],t3x:+monthlyT3X.value,t2x:+monthlyT2X.value,tst:+monthlyTST.value,status:monthlyTargetStatus.value};const idx=state.monthlyTargets.findIndex(x=>x.year==row.year&&x.month==row.month);if(idx>=0)state.monthlyTargets[idx]=row;else state.monthlyTargets.push(row);save();renderTargets();toast("Monthly target saved")}
+function lockMonthlyTarget(){const y=monthlyTargetYear.value,m=months[+monthlyTargetMonth.value-1];state.monthlyTargets.forEach(x=>{if(x.year==y&&x.month==m)x.status="Locked"});save();renderTargets();toast("Monthly target locked")}
+function clearMonthlyTargets(){if(confirm("Clear monthly targets?")){state.monthlyTargets=[];save();renderTargets();toast("Monthly targets cleared")}}
+function saveWeeklyTarget(){const row={year:weeklyTargetYear.value,month:months[+weeklyTargetMonth.value-1],week:weeklyTargetWeek.value,t3xWeekly:+weeklyT3X.value,t2xWeekly:+weeklyT2X.value,tstWeekly:+weeklyTST.value,status:weeklyTargetStatus.value};const idx=state.weeklyTargets.findIndex(x=>x.year==row.year&&x.month==row.month&&x.week==row.week);if(idx>=0)state.weeklyTargets[idx]=row;else state.weeklyTargets.push(row);save();renderTargets();toast("Weekly target saved")}
+function lockWeeklyTarget(){const y=weeklyTargetYear.value,m=months[+weeklyTargetMonth.value-1],w=weeklyTargetWeek.value;state.weeklyTargets.forEach(x=>{if(x.year==y&&x.month==m&&x.week==w)x.status="Locked"});save();renderTargets();toast("Weekly target locked")}
+function clearWeeklyTargets(){if(confirm("Clear weekly targets?")){state.weeklyTargets=[];save();renderTargets();toast("Weekly targets cleared")}}
+function renderTargets(){monthlyTargetBody.innerHTML=state.monthlyTargets.map(x=>`<tr><td>${x.year}</td><td>${x.month}</td><td>${x.t3x}</td><td>${x.t2x}</td><td>${x.tst}</td><td>${x.status}</td></tr>`).join("");weeklyTargetBody.innerHTML=state.weeklyTargets.map(x=>`<tr><td>${x.year}</td><td>${x.month}</td><td>${x.week}</td><td>${x.t3xWeekly}</td><td>${x.t2xWeekly}</td><td>${x.tstWeekly}</td><td>${x.status}</td></tr>`).join("");targetCount.innerText=state.monthlyTargets.length+state.weeklyTargets.length}
+
+function setHistCategory(c){state.histCategory=c;histCategoryLabel.innerText="Current Category: "+c;document.querySelectorAll(".category").forEach(b=>b.classList.remove("active"));document.getElementById("cat"+c)?.classList.add("active");renderHistorical()}
+function renderHistorical(){const data=state.hist[state.histCategory]||{};let rows="";[2025,2026].forEach(y=>{rows+=`<tr><td style="background:#203153;font-weight:900">${y}</td><td colspan="5" style="background:#203153;font-weight:900">${y} Data</td></tr>`;months.forEach(m=>{const r=data[`${y}-${m}`]||{},t=(+r.t3x||0)+(+r.t2x||0)+(+r.tst||0);rows+=`<tr data-key="${y}-${m}"><td>${y}</td><td>${m}</td><td contenteditable="true">${r.t3x||""}</td><td contenteditable="true">${r.t2x||""}</td><td contenteditable="true">${r.tst||""}</td><td>${t||""}</td></tr>`});rows+=`<tr><td style="background:#263d66;color:#ffd78a;font-weight:900">${y} Total</td><td style="background:#263d66"></td><td style="background:#263d66"></td><td style="background:#263d66"></td><td style="background:#263d66"></td><td style="background:#263d66"></td></tr>`});histBody.innerHTML=rows}
+function saveHistorical(){state.hist[state.histCategory]={};histBody.querySelectorAll("tr[data-key]").forEach(tr=>{const c=tr.querySelectorAll("td");state.hist[state.histCategory][tr.dataset.key]={t3x:c[2].innerText.trim(),t2x:c[3].innerText.trim(),tst:c[4].innerText.trim()}});save();renderHistorical();toast("Historical data saved")}
+function lockHistorical(){toast("Historical lock noted")}
+function clearHistorical(){if(confirm("Clear this historical category?")){state.hist[state.histCategory]={};save();renderHistorical();toast("Historical cleared")}}
+
+function loadTimers(){timerMode.value=state.timers.mode;coreTest.value=state.timers.coreTest;tstTest.value=state.timers.tstTest;boostTest.value=state.timers.boostTest;coreReal.value=state.timers.coreReal;tstReal.value=state.timers.tstReal;boostReal.value=state.timers.boostReal}
+function saveTimers(){state.timers={mode:timerMode.value,coreTest:Math.max(1,Math.round(+coreTest.value||1)),tstTest:Math.max(1,Math.round(+tstTest.value||1)),boostTest:Math.max(1,Math.round(+boostTest.value||1)),coreReal:Math.max(1,Math.round(+coreReal.value||240)),tstReal:Math.max(1,Math.round(+tstReal.value||60)),boostReal:Math.max(1,Math.round(+boostReal.value||30))};save();loadTimers();toast("Timer settings saved")}
+
+function updateBayRoleInfo(){const r=bayRoleMap[bayType.value];baySectionsPreview.value=r.sections;bayUpsPreview.value=r.ups}
+function addBay(){if(!bayName.value.trim())return toast("Enter bay name");const r=bayRoleMap[bayType.value];state.bays.push({name:bayName.value.trim(),type:r.role,sections:r.sections,ups:r.ups,status:"Active"});save();renderBays();toast("Bay added")}
+function renderBays(){bayBody.innerHTML=state.bays.map((x,i)=>`<tr><td>${x.name}</td><td>${x.type}</td><td>${x.sections}</td><td>${x.ups}</td><td><select class="inline-select" onchange="setBayStatus(${i},this.value)"><option ${x.status=="Active"?"selected":""}>Active</option><option ${x.status=="Disabled"?"selected":""}>Disabled</option></select></td></tr>`).join("")}
+function setBayStatus(i,v){state.bays[i].status=v;save();renderBays();toast("Bay status updated")}
+function saveBayMaster(){save();toast("Bay master saved")}
+
+function updateStageGroupInfo(){stageUpsPreview.value=stageGroupMap[stageGroup.value].ups}
+function addStage(){if(!stageName.value.trim())return toast("Enter stage name");const r=stageGroupMap[stageGroup.value];state.stages.push({group:stageGroup.value,ups:r.ups,name:stageName.value.trim(),order:+stageOrder.value,status:"Active"});save();renderStages();toast("Stage added")}
+function renderStages(){state.stages.sort((a,b)=>(a.group>b.group?1:-1)||a.order-b.order);stageBody.innerHTML=state.stages.map((x,i)=>`<tr><td>${x.group}</td><td>${x.ups}</td><td>${x.name}</td><td>${x.order}</td><td><select class="inline-select" onchange="setStageStatus(${i},this.value)"><option ${x.status=="Active"?"selected":""}>Active</option><option ${x.status=="Disabled"?"selected":""}>Disabled</option></select></td></tr>`).join("")}
+function setStageStatus(i,v){state.stages[i].status=v;save();renderStages();toast("Stage status updated")}
+function saveStageMaster(){save();toast("Stage master saved")}
+
+function renderSerials(){const ym=new Date().getFullYear()+String(new Date().getMonth()+1).padStart(2,"0");serialBody.innerHTML=Object.entries(state.serials).map(([k,v])=>`<tr><td>${k}</td><td>${String(v).padStart(4,"0")}</td><td>${ym}${k}${String(v+1).padStart(4,"0")}</td></tr>`).join("")}
+function saveSerial(){state.serials[serialType.value]=+serialCounter.value;save();renderSerials();toast("Counter saved")}
+function renderOld(){oldBody.innerHTML=state.oldSerials.map(x=>`<tr><td>${x.serial}</td><td>${x.type}</td><td>${x.reason}</td><td>${x.location}</td></tr>`).join("")}
+function addOldSerial(){if(!oldSerialNo.value.trim())return toast("Enter old serial");state.oldSerials.push({serial:oldSerialNo.value.trim(),type:oldType.value,reason:oldReason.value,location:oldLocation.value});save();renderOld();toast("Old serial added")}
+
+
+function getLiveLogRows(){try{return JSON.parse(localStorage.getItem("trinergyLiveLogV1")||"[]")}catch(e){return[]}}
+function clearLiveLog(){if(confirm("Clear dashboard live log?")){localStorage.setItem("trinergyLiveLogV1","[]");renderReport();toast("Live log cleared")}}
+function initReportSelectors(){if(!document.getElementById("reportYear"))return;const y=new Date().getFullYear();let html="";for(let i=2024;i<=2032;i++)html+=`<option>${i}</option>`;reportYear.innerHTML=html;reportYear.value=String(y)}
+function emptyMonthlyReport(){const out={};months.forEach(m=>out[m]={T3X:0,T2X:0,TST:0,rta:0});return out}
+function getHistoricalNumber(category,year,month,type){const cat=(state.hist||{})[category]||{};const row=cat[`${year}-${month}`]||{};return Number(row[type.toLowerCase()])||0}
+function buildReportData(){
+  const year=reportYear.value, selectedType=reportType.value, source=reportSource.value, data=emptyMonthlyReport();
+  if(source!=="Live Only"){
+    months.forEach(m=>["T3X","T2X","TST"].forEach(t=>{data[m][t]+=getHistoricalNumber("Completed",year,m,t);data[m].rta+=getHistoricalNumber("RTA",year,m,t)}));
+  }
+  if(source!=="Historical Only"){
+    getLiveLogRows().filter(r=>String(r.year)===String(year)).forEach(r=>{
+      if(!data[r.month])return;
+      if(r.eventType==="COMPLETED") data[r.month][r.type]=(data[r.month][r.type]||0)+1;
+      if(r.eventType==="RTA"||r.eventType==="TIMER_FAULTY") data[r.month].rta+=1;
+    });
+  }
+  if(selectedType!=="All") months.forEach(m=>["T3X","T2X","TST"].forEach(t=>{if(t!==selectedType)data[m][t]=0}));
+  return data;
+}
+function monthlyTotal(row){return(row.T3X||0)+(row.T2X||0)+(row.TST||0)}
+function renderReportTable(data){reportTableBody.innerHTML=months.map(m=>{const c=monthlyTotal(data[m]),r=data[m].rta||0,f=c?Math.max(0,Math.round(((c-r)/c)*100)):100;return`<tr><td>${m}</td><td>${data[m].T3X||0}</td><td>${data[m].T2X||0}</td><td>${data[m].TST||0}</td><td>${c}</td><td>${r}</td><td>${f}%</td></tr>`}).join("")}
+function renderReportSummary(data){let c=0,r=0;months.forEach(m=>{c+=monthlyTotal(data[m]);r+=data[m].rta||0});repCompleted.innerText=c;repRta.innerText=r;repFpy.innerText=c?Math.max(0,Math.round(((c-r)/c)*100))+"%":"100%";repLiveRows.innerText=getLiveLogRows().length}
+function drawChart(data){
+  const canvas=document.getElementById("reportCanvas");if(!canvas)return;const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="#0f1a2f";ctx.fillRect(0,0,canvas.width,canvas.height);
+  const chart=reportChart.value,pad=55,w=canvas.width-pad*2,h=canvas.height-pad*2;
+  const vals=months.map(m=>{const c=monthlyTotal(data[m]),r=data[m].rta||0,f=c?Math.max(0,Math.round(((c-r)/c)*100)):100;if(chart==="FPY Trend")return f;if(chart==="RTA Trend")return r;return c});
+  const max=Math.max(10,...vals);ctx.strokeStyle="#334b75";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+h);ctx.lineTo(pad+w,pad+h);ctx.stroke();ctx.fillStyle="#eef5ff";ctx.font="18px Segoe UI";ctx.fillText(chart,pad,28);ctx.font="12px Segoe UI";ctx.fillStyle="#a8bad8";months.forEach((m,i)=>ctx.fillText(m,pad+i*(w/(months.length-1))-10,pad+h+22));
+  if(chart==="FPY Trend"){ctx.strokeStyle="#29d17d";ctx.lineWidth=3;ctx.beginPath();vals.forEach((v,i)=>{const x=pad+i*(w/(months.length-1)),y=pad+h-(v/100)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();}
+  else if(chart==="Completed vs FPY"){const comp=months.map(m=>monthlyTotal(data[m])),maxComp=Math.max(10,...comp);months.forEach((m,i)=>{const x=pad+i*(w/months.length)+8,bw=(w/months.length)-16,bh=(comp[i]/maxComp)*h;ctx.fillStyle="#6ea4ff";ctx.fillRect(x,pad+h-bh,bw,bh)});ctx.strokeStyle="#29d17d";ctx.lineWidth=3;ctx.beginPath();months.forEach((m,i)=>{const c=monthlyTotal(data[m]),r=data[m].rta||0,f=c?Math.max(0,Math.round(((c-r)/c)*100)):100,x=pad+i*(w/(months.length-1)),y=pad+h-(f/100)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();}
+  else{months.forEach((m,i)=>{const x=pad+i*(w/months.length)+8,bw=(w/months.length)-16,bh=(vals[i]/max)*h;ctx.fillStyle=chart==="RTA Trend"?"#ffb347":"#6ea4ff";ctx.fillRect(x,pad+h-bh,bw,bh);ctx.fillStyle="#eef5ff";ctx.fillText(String(vals[i]),x+bw/2-6,pad+h-bh-8)})}
+}
+function renderReport(){const data=buildReportData();renderReportSummary(data);renderReportTable(data);drawChart(data)}
+
+
+/* ===== v5.2 REPORT FILTER FIX OVERRIDES ===== */
+function liveRowMatchesType(row, selectedType){
+  return selectedType === "All" || row.type === selectedType;
+}
+
+function getFilteredLiveLogRows(){
+  const year = document.getElementById("reportYear") ? reportYear.value : String(new Date().getFullYear());
+  const selectedType = document.getElementById("reportType") ? reportType.value : "All";
+  return getLiveLogRows().filter(r => String(r.year) === String(year) && liveRowMatchesType(r, selectedType));
+}
+
+function buildReportData(){
+  const year = reportYear.value;
+  const selectedType = reportType.value;
+  const source = reportSource.value;
+  const data = emptyMonthlyReport();
+
+  if(source !== "Live Only"){
+    months.forEach(m=>{
+      ["T3X","T2X","TST"].forEach(t=>{
+        if(selectedType !== "All" && t !== selectedType) return;
+        data[m][t] += getHistoricalNumber("Completed", year, m, t);
+        data[m].rta += getHistoricalNumber("RTA", year, m, t);
+      });
+    });
+  }
+
+  if(source !== "Historical Only"){
+    getLiveLogRows()
+      .filter(r => String(r.year) === String(year) && liveRowMatchesType(r, selectedType))
+      .forEach(r=>{
+        if(!data[r.month]) return;
+        if(r.eventType === "COMPLETED"){
+          data[r.month][r.type] = (data[r.month][r.type] || 0) + 1;
+        }
+        if(r.eventType === "RTA" || r.eventType === "TIMER_FAULTY"){
+          data[r.month].rta += 1;
+        }
+      });
+  }
+
+  return data;
+}
+
+function calcFpy(completed, rta){
+  if(!completed) return null;
+  return Math.max(0, Math.round(((completed - rta) / completed) * 100));
+}
+
+function renderReportTable(data){
+  reportTableBody.innerHTML = months.map(m=>{
+    const completed = monthlyTotal(data[m]);
+    const rta = data[m].rta || 0;
+    const fpy = calcFpy(completed, rta);
+    return `<tr>
+      <td>${m}</td>
+      <td>${data[m].T3X || 0}</td>
+      <td>${data[m].T2X || 0}</td>
+      <td>${data[m].TST || 0}</td>
+      <td>${completed}</td>
+      <td>${rta}</td>
+      <td>${fpy === null ? "-" : fpy + "%"}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderReportSummary(data){
+  let completed = 0;
+  let rta = 0;
+  months.forEach(m=>{
+    completed += monthlyTotal(data[m]);
+    rta += data[m].rta || 0;
+  });
+
+  const fpy = calcFpy(completed, rta);
+  repCompleted.innerText = completed;
+  repRta.innerText = rta;
+  repFpy.innerText = fpy === null ? "-" : fpy + "%";
+  repLiveRows.innerText = getFilteredLiveLogRows().length;
+}
+
+function drawChart(data){
+  const canvas = document.getElementById("reportCanvas");
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#0f1a2f";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const chart = reportChart.value;
+  const pad = 55;
+  const w = canvas.width - pad * 2;
+  const h = canvas.height - pad * 2;
+
+  const vals = months.map(m=>{
+    const completed = monthlyTotal(data[m]);
+    const rta = data[m].rta || 0;
+    const fpy = calcFpy(completed, rta);
+    if(chart === "FPY Trend") return fpy === null ? null : fpy;
+    if(chart === "RTA Trend") return rta;
+    return completed;
+  });
+
+  const numericVals = vals.filter(v => v !== null);
+  const max = Math.max(10, ...numericVals);
+
+  ctx.strokeStyle = "#334b75";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad,pad);
+  ctx.lineTo(pad,pad+h);
+  ctx.lineTo(pad+w,pad+h);
+  ctx.stroke();
+
+  ctx.fillStyle = "#eef5ff";
+  ctx.font = "18px Segoe UI";
+  ctx.fillText(`${chart} - ${reportType.value}`, pad, 28);
+
+  ctx.font = "12px Segoe UI";
+  ctx.fillStyle = "#a8bad8";
+  months.forEach((m,i)=>{
+    const x = pad + i * (w / (months.length - 1));
+    ctx.fillText(m, x - 10, pad + h + 22);
+  });
+
+  if(chart === "FPY Trend"){
+    ctx.strokeStyle = "#29d17d";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    let started = false;
+    vals.forEach((v,i)=>{
+      if(v === null) return;
+      const x = pad + i * (w / (months.length - 1));
+      const y = pad + h - (v / 100) * h;
+      if(!started){ ctx.moveTo(x,y); started = true; }
+      else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  } else if(chart === "Completed vs FPY"){
+    const comp = months.map(m=>monthlyTotal(data[m]));
+    const maxComp = Math.max(10, ...comp);
+    months.forEach((m,i)=>{
+      const x = pad + i * (w / months.length) + 8;
+      const bw = (w / months.length) - 16;
+      const bh = (comp[i] / maxComp) * h;
+      ctx.fillStyle = "#6ea4ff";
+      ctx.fillRect(x, pad + h - bh, bw, bh);
+      ctx.fillStyle = "#eef5ff";
+      if(comp[i]) ctx.fillText(String(comp[i]), x + bw/2 - 6, pad + h - bh - 8);
+    });
+
+    ctx.strokeStyle = "#29d17d";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    let started = false;
+    months.forEach((m,i)=>{
+      const completed = monthlyTotal(data[m]);
+      const rta = data[m].rta || 0;
+      const f = calcFpy(completed, rta);
+      if(f === null) return;
+      const x = pad + i * (w / (months.length - 1));
+      const y = pad + h - (f / 100) * h;
+      if(!started){ ctx.moveTo(x,y); started = true; }
+      else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  } else {
+    months.forEach((m,i)=>{
+      const v = vals[i] || 0;
+      const x = pad + i * (w / months.length) + 8;
+      const bw = (w / months.length) - 16;
+      const bh = (v / max) * h;
+      ctx.fillStyle = chart === "RTA Trend" ? "#ffb347" : "#6ea4ff";
+      ctx.fillRect(x, pad + h - bh, bw, bh);
+      ctx.fillStyle = "#eef5ff";
+      if(v) ctx.fillText(String(v), x + bw/2 - 6, pad + h - bh - 8);
+    });
+  }
+}
+
+function renderReport(){
+  const data = buildReportData();
+  renderReportSummary(data);
+  renderReportTable(data);
+  drawChart(data);
+}
+/* ===== END v5.2 REPORT FILTER FIX OVERRIDES ===== */
+
+
+/* ===== v5.3 FPY CHART VISIBILITY FIX ===== */
+function drawChart(data){
+  const canvas = document.getElementById("reportCanvas");
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#0f1a2f";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const chart = reportChart.value;
+  const pad = 60;
+  const rightPad = 70;
+  const topPad = 58;
+  const bottomPad = 55;
+  const w = canvas.width - pad - rightPad;
+  const h = canvas.height - topPad - bottomPad;
+
+  const completedVals = months.map(m => monthlyTotal(data[m]));
+  const rtaVals = months.map(m => data[m].rta || 0);
+  const fpyVals = months.map(m => {
+    const c = monthlyTotal(data[m]);
+    const r = data[m].rta || 0;
+    return calcFpy(c, r);
+  });
+
+  ctx.fillStyle = "#eef5ff";
+  ctx.font = "20px Segoe UI";
+  ctx.fillText(`${chart} - ${reportType.value}`, pad, 30);
+
+  ctx.strokeStyle = "#334b75";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, topPad);
+  ctx.lineTo(pad, topPad + h);
+  ctx.lineTo(pad + w, topPad + h);
+  ctx.stroke();
+
+  ctx.font = "12px Segoe UI";
+  ctx.fillStyle = "#a8bad8";
+  months.forEach((m,i)=>{
+    const x = pad + i * (w / (months.length - 1));
+    ctx.fillText(m, x - 10, topPad + h + 24);
+  });
+
+  function drawBars(values, color){
+    const maxVal = Math.max(10, ...values);
+    months.forEach((m,i)=>{
+      const x = pad + i * (w / months.length) + 8;
+      const bw = (w / months.length) - 16;
+      const bh = (values[i] / maxVal) * h;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, topPad + h - bh, bw, bh);
+      if(values[i]){
+        ctx.fillStyle = "#eef5ff";
+        ctx.fillText(String(values[i]), x + bw/2 - 6, topPad + h - bh - 8);
+      }
+    });
+  }
+
+  function drawFpyLine(){
+    ctx.strokeStyle = "#29d17d";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    let started = false;
+
+    fpyVals.forEach((v,i)=>{
+      if(v === null) return;
+      const x = pad + i * (w / (months.length - 1));
+      const y = topPad + h - (v / 100) * h;
+      if(!started){ ctx.moveTo(x,y); started = true; }
+      else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    fpyVals.forEach((v,i)=>{
+      if(v === null) return;
+      const x = pad + i * (w / (months.length - 1));
+      const y = topPad + h - (v / 100) * h;
+      ctx.fillStyle = "#29d17d";
+      ctx.beginPath();
+      ctx.arc(x,y,5,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#eef5ff";
+      ctx.font = "12px Segoe UI";
+      ctx.fillText(v + "%", x - 14, y - 12);
+    });
+
+    ctx.strokeStyle = "#29d17d";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad + w, topPad);
+    ctx.lineTo(pad + w, topPad + h);
+    ctx.stroke();
+
+    ctx.fillStyle = "#29d17d";
+    ctx.font = "12px Segoe UI";
+    ctx.fillText("FPY %", pad + w + 16, topPad - 8);
+    [0,25,50,75,100].forEach(v=>{
+      const y = topPad + h - (v/100)*h;
+      ctx.fillText(String(v), pad + w + 12, y + 4);
+    });
+  }
+
+  if(chart === "Completed Trend"){
+    drawBars(completedVals, "#6ea4ff");
+    ctx.fillStyle = "#6ea4ff";
+    ctx.fillText("Completed", pad + 10, 50);
+  } else if(chart === "RTA Trend"){
+    drawBars(rtaVals, "#ffb347");
+    ctx.fillStyle = "#ffb347";
+    ctx.fillText("RTA / Fault", pad + 10, 50);
+  } else if(chart === "FPY Trend"){
+    drawFpyLine();
+  } else if(chart === "Completed vs FPY"){
+    drawBars(completedVals, "#6ea4ff");
+    drawFpyLine();
+
+    ctx.fillStyle = "#6ea4ff";
+    ctx.fillRect(pad + 10, 42, 14, 10);
+    ctx.fillStyle = "#eef5ff";
+    ctx.fillText("Completed", pad + 30, 52);
+
+    ctx.fillStyle = "#29d17d";
+    ctx.fillRect(pad + 130, 42, 14, 10);
+    ctx.fillStyle = "#eef5ff";
+    ctx.fillText("FPY %", pad + 150, 52);
+  }
+}
+/* ===== END v5.3 FPY CHART VISIBILITY FIX ===== */
+
+
+/* ===== v5.5 DUAL AXIS CHART FIX ===== */
+function drawChart(data){
+  const canvas = document.getElementById("reportCanvas");
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#0f1a2f";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  const chart = reportChart.value;
+  const pad = 72;
+  const rightPad = 78;
+  const topPad = 62;
+  const bottomPad = 58;
+  const w = canvas.width - pad - rightPad;
+  const h = canvas.height - topPad - bottomPad;
+
+  const completedVals = months.map(m => monthlyTotal(data[m]));
+  const rtaVals = months.map(m => data[m].rta || 0);
+  const fpyVals = months.map(m => {
+    const c = monthlyTotal(data[m]);
+    const r = data[m].rta || 0;
+    return calcFpy(c, r);
+  });
+
+  const maxCompletedRaw = Math.max(1, ...completedVals);
+  const maxCompleted = Math.max(5, Math.ceil(maxCompletedRaw / 5) * 5);
+  const maxRtaRaw = Math.max(1, ...rtaVals);
+  const maxRta = Math.max(5, Math.ceil(maxRtaRaw / 5) * 5);
+
+  ctx.fillStyle = "#eef5ff";
+  ctx.font = "20px Segoe UI";
+  ctx.fillText(`${chart} - ${reportType.value}`, pad, 30);
+
+  // Base axes
+  ctx.strokeStyle = "#334b75";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, topPad);
+  ctx.lineTo(pad, topPad + h);
+  ctx.lineTo(pad + w, topPad + h);
+  ctx.stroke();
+
+  // Month labels
+  ctx.font = "12px Segoe UI";
+  ctx.fillStyle = "#a8bad8";
+  months.forEach((m,i)=>{
+    const x = pad + i * (w / (months.length - 1));
+    ctx.fillText(m, x - 10, topPad + h + 24);
+  });
+
+  function drawLeftAxis(maxVal, label, color){
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(pad, topPad);
+    ctx.lineTo(pad, topPad + h);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.font = "12px Segoe UI";
+    ctx.fillText(label, pad - 56, topPad - 10);
+
+    const steps = 5;
+    for(let i=0;i<=steps;i++){
+      const val = Math.round((i/steps) * maxVal);
+      const y = topPad + h - (i/steps) * h;
+
+      ctx.fillStyle = color;
+      ctx.fillText(String(val), pad - 38, y + 4);
+
+      ctx.strokeStyle = "rgba(168,186,216,.12)";
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(pad + w, y);
+      ctx.stroke();
+    }
+  }
+
+  function drawRightFpyAxis(){
+    ctx.strokeStyle = "#29d17d";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(pad + w, topPad);
+    ctx.lineTo(pad + w, topPad + h);
+    ctx.stroke();
+
+    ctx.fillStyle = "#29d17d";
+    ctx.font = "12px Segoe UI";
+    ctx.fillText("FPY %", pad + w + 16, topPad - 10);
+
+    [0,25,50,75,100].forEach(v=>{
+      const y = topPad + h - (v/100)*h;
+      ctx.fillText(String(v), pad + w + 14, y + 4);
+    });
+  }
+
+  function drawBars(values, maxVal, color){
+    months.forEach((m,i)=>{
+      const x = pad + i * (w / months.length) + 8;
+      const bw = (w / months.length) - 16;
+      const bh = (values[i] / maxVal) * h;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, topPad + h - bh, bw, bh);
+      if(values[i]){
+        ctx.fillStyle = "#eef5ff";
+        ctx.font = "12px Segoe UI";
+        ctx.fillText(String(values[i]), x + bw/2 - 6, topPad + h - bh - 8);
+      }
+    });
+  }
+
+  function drawFpyLine(){
+    ctx.strokeStyle = "#29d17d";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    let started = false;
+
+    fpyVals.forEach((v,i)=>{
+      if(v === null) return;
+      const x = pad + i * (w / (months.length - 1));
+      const y = topPad + h - (v / 100) * h;
+      if(!started){ ctx.moveTo(x,y); started = true; }
+      else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    fpyVals.forEach((v,i)=>{
+      if(v === null) return;
+      const x = pad + i * (w / (months.length - 1));
+      const y = topPad + h - (v / 100) * h;
+      ctx.fillStyle = "#29d17d";
+      ctx.beginPath();
+      ctx.arc(x,y,5,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = "#eef5ff";
+      ctx.font = "12px Segoe UI";
+      ctx.fillText(v + "%", x - 14, y - 12);
+    });
+  }
+
+  function drawLegend(items){
+    let x = pad + 10;
+    const y = 42;
+    items.forEach(item=>{
+      ctx.fillStyle = item.color;
+      ctx.fillRect(x, y, 14, 10);
+      ctx.fillStyle = "#eef5ff";
+      ctx.font = "12px Segoe UI";
+      ctx.fillText(item.label, x + 20, y + 10);
+      x += item.width || 120;
+    });
+  }
+
+  if(chart === "Completed Trend"){
+    drawLeftAxis(maxCompleted, "Completed", "#6ea4ff");
+    drawBars(completedVals, maxCompleted, "#6ea4ff");
+    drawLegend([{label:"Completed",color:"#6ea4ff"}]);
+  }
+  else if(chart === "RTA Trend"){
+    drawLeftAxis(maxRta, "RTA/Fault", "#ffb347");
+    drawBars(rtaVals, maxRta, "#ffb347");
+    drawLegend([{label:"RTA / Fault",color:"#ffb347"}]);
+  }
+  else if(chart === "FPY Trend"){
+    drawRightFpyAxis();
+    drawFpyLine();
+    drawLegend([{label:"FPY %",color:"#29d17d"}]);
+  }
+  else if(chart === "Completed vs FPY"){
+    drawLeftAxis(maxCompleted, "Completed", "#6ea4ff");
+    drawRightFpyAxis();
+    drawBars(completedVals, maxCompleted, "#6ea4ff");
+    drawFpyLine();
+    drawLegend([
+      {label:"Completed",color:"#6ea4ff",width:130},
+      {label:"FPY %",color:"#29d17d",width:90}
+    ]);
+  }
+}
+/* ===== END v5.5 DUAL AXIS CHART FIX ===== */
+
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();
+</script>
+</body>
+</html>
