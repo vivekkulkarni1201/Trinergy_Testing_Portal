@@ -65,75 +65,29 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-/* ===== v6.4 ADMIN TESTING ENGINEERS FIXED ===== */
-function ensureMasterEngineers(){
-  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [{name:"Vivek", active:true}];
-}
 
-function renderMasterEngineers(){
-  ensureMasterEngineers();
-  const box = document.getElementById("engineerList");
-  if(!box) return;
-  box.innerHTML = state.masterEngineers.map((e,i)=>`
-    <div class="engineer-list-card">
-      <div class="engineer-pill">${e.name}</div>
-      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
-      <div>
-        <button onclick="editMasterEngineer(${i})">Edit</button>
-        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
-      </div>
-    </div>
-  `).join("") || `<p class="muted">No engineers added.</p>`;
-}
-
-function addMasterEngineer(){
-  ensureMasterEngineers();
-  const name = (document.getElementById("engName").value || "").trim();
-  const active = document.getElementById("engStatus").value === "active";
-  if(!name){ alert("Enter engineer name"); return; }
-
-  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
-  if(idx >= 0) state.masterEngineers[idx] = {name, active};
-  else state.masterEngineers.push({name, active});
-
-  save();
-  renderMasterEngineers();
-  clearEngineerForm();
-  alert("Testing engineer list updated");
-}
-
-function editMasterEngineer(i){
-  ensureMasterEngineers();
-  const e = state.masterEngineers[i];
-  if(!e) return;
-  document.getElementById("engName").value = e.name;
-  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
-}
-
-function deleteMasterEngineer(i){
-  ensureMasterEngineers();
-  if(!confirm("Delete this engineer?")) return;
-  state.masterEngineers.splice(i,1);
-  save();
-  renderMasterEngineers();
-}
-
-function clearEngineerForm(){
-  const n = document.getElementById("engName");
-  const s = document.getElementById("engStatus");
-  if(n) n.value = "";
-  if(s) s.value = "active";
-}
-/* ===== END v6.4 ADMIN TESTING ENGINEERS FIXED ===== */
 
 
 const __oldShowTabForEngineers = typeof showTab === "function" ? showTab : null;
 if(__oldShowTabForEngineers){
   showTab = function(tab){
     __oldShowTabForEngineers(tab);
-    if(tab === "engineers") renderMasterEngineers();
+    if(tab === "engineers") safeRenderMasterEngineers();
   }
 }
+
+
+/* v6.4.1 show Testing Engineers tab hook */
+(function(){
+  const oldShowTab = typeof showTab === "function" ? showTab : null;
+  if(oldShowTab && !window.__engineerTabHooked){
+    window.__engineerTabHooked = true;
+    showTab = function(tab){
+      oldShowTab(tab);
+      if(tab === "engineers") safeRenderMasterEngineers();
+    };
+  }
+})();
 
 </script>
 </head>
@@ -145,7 +99,7 @@ if(__oldShowTabForEngineers){
     <input id="adminPasswordInput" type="password" placeholder="Admin Password" onkeydown="if(event.key==='Enter') checkAdminPassword()">
     <button class="success" onclick="checkAdminPassword()">Unlock Admin</button>
     <div class="login-error" id="loginError">Wrong password</div>
-    <p style="font-size:12px;margin-top:14px;">Default password: <b>admin123</b></p>
+    
   </div>
 </div>
 
@@ -171,6 +125,7 @@ if(__oldShowTabForEngineers){
   <button class="tab" onclick="showTab('serials', this)">Serials</button>
   <button class="tab" onclick="showTab('oldserial', this)">Old Serial Re-entry</button>
   <button class="tab" onclick="showTab('reports', this)">Reports</button>
+<button onclick="showTab('engineers')">Testing Engineers</button>
 </nav>
 
 <section id="targets" class="tab-content active">
@@ -335,6 +290,74 @@ if(__oldShowTabForEngineers){
 </section>
 
 <script>
+
+/* ===== v6.4.1 ADMIN TESTING ENGINEERS FIX ===== */
+function ensureMasterEngineers(){
+  if(typeof state === "undefined") return;
+  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [{name:"Vivek", active:true}];
+}
+
+function renderMasterEngineers(){
+  if(typeof state === "undefined") return;
+  ensureMasterEngineers();
+  const box = document.getElementById("engineerList");
+  if(!box) return;
+  box.innerHTML = state.masterEngineers.map((e,i)=>`
+    <div class="engineer-list-card">
+      <div class="engineer-pill">${e.name}</div>
+      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
+      <div>
+        <button onclick="editMasterEngineer(${i})">Edit</button>
+        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
+      </div>
+    </div>
+  `).join("") || `<p class="muted">No engineers added.</p>`;
+}
+
+function safeRenderMasterEngineers(){
+  try{ renderMasterEngineers(); }catch(e){ console.warn("Testing Engineers render skipped", e); }
+}
+
+function addMasterEngineer(){
+  ensureMasterEngineers();
+  const name = (document.getElementById("engName").value || "").trim();
+  const active = document.getElementById("engStatus").value === "active";
+  if(!name){ alert("Enter engineer name"); return; }
+
+  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
+  if(idx >= 0) state.masterEngineers[idx] = {name, active};
+  else state.masterEngineers.push({name, active});
+
+  save();
+  safeRenderMasterEngineers();
+  clearEngineerForm();
+  alert("Testing engineer list updated");
+}
+
+function editMasterEngineer(i){
+  ensureMasterEngineers();
+  const e = state.masterEngineers[i];
+  if(!e) return;
+  document.getElementById("engName").value = e.name;
+  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
+}
+
+function deleteMasterEngineer(i){
+  ensureMasterEngineers();
+  if(!confirm("Delete this engineer?")) return;
+  state.masterEngineers.splice(i,1);
+  save();
+  safeRenderMasterEngineers();
+}
+
+function clearEngineerForm(){
+  const n = document.getElementById("engName");
+  const s = document.getElementById("engStatus");
+  if(n) n.value = "";
+  if(s) s.value = "active";
+}
+/* ===== END v6.4.1 ADMIN TESTING ENGINEERS FIX ===== */
+
 
 /* ===== v6 CLOUD SYNC - ADMIN ===== */
 const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
@@ -1071,7 +1094,7 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();safeRenderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
 </body>
 </html>
