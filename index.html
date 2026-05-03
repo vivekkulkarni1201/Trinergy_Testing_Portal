@@ -477,6 +477,19 @@
   <script>
     let UPS_LIST = [];
     let SELECTED_UPS_ID = null;
+
+    /* ===== v6.5 SELECTED UPS HELPER FIX ===== */
+    function getSelectedUPS() {
+      if (!SELECTED_UPS_ID) return null;
+      return UPS_LIST.find(u => u.id === SELECTED_UPS_ID) || null;
+    }
+
+    function clearSelectedUPS() {
+      SELECTED_UPS_ID = null;
+    }
+    /* ===== END v6.5 SELECTED UPS HELPER FIX ===== */
+
+
     
     /* ===== v6.4 LOGIN + ROLE SYSTEM ===== */
     const TRINERGY_USERS = [
