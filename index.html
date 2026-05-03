@@ -459,7 +459,7 @@
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
 
-    /* ===== v6.4 MASTER ENGINEER ACCESS CONTROL FIXED ===== */
+    /* ===== v6.4.2 MASTER ENGINEER ACCESS CONTROL ===== */
     let MASTER_ENGINEERS = [];
 
     function normName(x){ return String(x || "").trim().toLowerCase(); }
@@ -471,7 +471,7 @@
 
     function syncMasterEngineersFromAdmin(){
       const cfg = getAdminConfigForAccess();
-      MASTER_ENGINEERS = Array.isArray(cfg.masterEngineers) ? cfg.masterEngineers : [];
+      MASTER_ENGINEERS = Array.isArray(cfg.masterEngineers) ? cfg.masterEngineers : [{name:"Vivek", active:true}];
     }
 
     function isCurrentEngineerAllowed(){
@@ -515,7 +515,7 @@
       alert("View only access. Ask Admin to add your name in Testing Engineers list.");
       return false;
     }
-    /* ===== END v6.4 MASTER ENGINEER ACCESS CONTROL FIXED ===== */
+    /* ===== END v6.4.2 MASTER ENGINEER ACCESS CONTROL ===== */
 
 
     /* ===== v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */
