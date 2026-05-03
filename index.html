@@ -2183,5 +2183,62 @@ setInterval(showViewOnlyPanel, 2000);
 /* ===== END v6.4.9 GUARANTEED SWITCH ENGINEER BUTTON ===== */
 </script>
 
+
+<script>
+/* ===== v6.5.0 AUTO MIDNIGHT KPI REFRESH ===== */
+(function(){
+  let lastDateKey = new Date().toDateString();
+
+  function showMidnightToast(msg){
+    try{
+      const t = document.createElement("div");
+      t.textContent = msg;
+      t.style.position = "fixed";
+      t.style.right = "18px";
+      t.style.bottom = "18px";
+      t.style.zIndex = "99999";
+      t.style.padding = "12px 16px";
+      t.style.borderRadius = "14px";
+      t.style.background = "rgba(41,209,125,.95)";
+      t.style.color = "#061321";
+      t.style.fontWeight = "900";
+      t.style.boxShadow = "0 10px 28px rgba(0,0,0,.35)";
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), 6000);
+    }catch(e){}
+  }
+
+  function autoMidnightKpiCheck(){
+    const nowKey = new Date().toDateString();
+
+    if(nowKey !== lastDateKey){
+      lastDateKey = nowKey;
+
+      console.log("📅 New day/week detected → Auto KPI refresh");
+
+      try{
+        if(typeof render === "function") render();
+      }catch(e){
+        console.warn("Auto KPI render failed", e);
+      }
+
+      try{
+        if(typeof renderKPIs === "function") renderKPIs();
+      }catch(e){}
+
+      try{
+        if(typeof renderStatusBoxes === "function") renderStatusBoxes();
+      }catch(e){}
+
+      showMidnightToast("New day/week detected — KPI auto refreshed ✔");
+    }
+  }
+
+  setInterval(autoMidnightKpiCheck, 10000);
+  setTimeout(autoMidnightKpiCheck, 1500);
+})();
+/* ===== END v6.5.0 AUTO MIDNIGHT KPI REFRESH ===== */
+</script>
+
 </body>
 </html>
