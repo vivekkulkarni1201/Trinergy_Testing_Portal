@@ -34,6 +34,7 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 .login-card h2{margin:0 0 10px}.login-card p{color:#a8bad8;margin:0 0 14px}.login-card button{margin-top:12px;width:100%}
 .login-error{color:#ff9a9a;font-weight:800;margin-top:10px;display:none}
 @media(max-width:1000px){.form-grid,.mini-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.form-grid,.mini-grid{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start;gap:12px}}
+.cloud-badge{display:inline-block;margin-left:10px;padding:5px 10px;border-radius:999px;background:rgba(41,209,125,.14);border:1px solid rgba(41,209,125,.5);color:#29d17d;font-weight:900;font-size:12px;letter-spacing:.04em;}
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -50,14 +51,14 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 </div>
 
 <header class="topbar">
-  <div class="brand"><div class="logo">VERTIV</div><div><div class="title">TRINERGY ADMIN CONTROL PANEL</div><div class="subtitle">Clean Connected Admin v4.2</div></div></div>
+  <div class="brand"><div class="logo">VERTIV</div><div><div class="title">TRINERGY ADMIN CONTROL PANEL <span class="cloud-badge">● CLOUD LIVE</span></div><div class="subtitle">LIVE CLOUD ADMIN - Realtime Configuration</div></div></div>
   <div class="top-info"><div>Date: <span id="dateText">--</span></div><div>Time: <span id="timeText">--</span></div><div>ISO Week: <span id="weekText">--</span></div></div>
 </header>
 
 <main class="page">
 <section class="mini-grid">
-  <div class="mini-card"><div class="mini-title">Dashboard Status</div><div class="mini-value">Locked</div><div class="mini-sub">Front page untouched</div></div>
-  <div class="mini-card"><div class="mini-title">Admin Mode</div><div class="mini-value">Local</div><div class="mini-sub">Saved in browser</div></div>
+  <div class="mini-card"><div class="mini-title">Dashboard Status</div><div class="mini-value">Locked</div><div class="mini-sub">Dashboard connected live</div></div>
+  <div class="mini-card"><div class="mini-title">Admin Mode</div><div class="mini-value">Local</div><div class="mini-sub">Supabase realtime</div></div>
   <div class="mini-card"><div class="mini-title">Target Rows</div><div class="mini-value" id="targetCount">0</div><div class="mini-sub">Monthly + weekly</div></div>
   <div class="mini-card"><div class="mini-title">Masters</div><div class="mini-value">Ready</div><div class="mini-sub">Bays and stages</div></div>
 </section>
