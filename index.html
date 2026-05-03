@@ -313,16 +313,9 @@
 
 
     .access-badge{
-      display:inline-block;
-      margin-left:10px;
-      padding:5px 10px;
-      border-radius:999px;
-      font-weight:900;
-      font-size:12px;
-      letter-spacing:.04em;
-      border:1px solid rgba(168,186,216,.35);
-      background:rgba(168,186,216,.10);
-      color:#a8bad8;
+      display:inline-block;margin-left:10px;padding:5px 10px;border-radius:999px;
+      font-weight:900;font-size:12px;letter-spacing:.04em;
+      border:1px solid rgba(168,186,216,.35);background:rgba(168,186,216,.10);color:#a8bad8;
     }
     .access-badge.edit{background:rgba(41,209,125,.14);border-color:rgba(41,209,125,.50);color:#29d17d;}
     .access-badge.view{background:rgba(255,193,7,.13);border-color:rgba(255,193,7,.45);color:#ffd166;}
@@ -447,27 +440,22 @@
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
 
-    /* ===== v6.4.3 MASTER ENGINEER ACCESS CONTROL ===== */
+    /* ===== v6.4.5 MASTER ENGINEER ACCESS CONTROL ===== */
     let MASTER_ENGINEERS = [];
-
     function normName(x){ return String(x || "").trim().toLowerCase(); }
-
     function getAdminConfigForAccess(){
       try { return JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}"); }
       catch(e){ return {}; }
     }
-
     function syncMasterEngineersFromAdmin(){
       const cfg = getAdminConfigForAccess();
       MASTER_ENGINEERS = Array.isArray(cfg.masterEngineers) ? cfg.masterEngineers : [{name:"Vivek", active:true}];
     }
-
     function isCurrentEngineerAllowed(){
       syncMasterEngineersFromAdmin();
       const me = normName(CURRENT_ENGINEER_NAME);
       return MASTER_ENGINEERS.some(e => e && e.active !== false && normName(e.name) === me);
     }
-
     function updateAccessBadge(){
       const title = document.querySelector(".title");
       if(!title) return;
@@ -481,7 +469,6 @@
       badge.className = "access-badge " + (allowed ? "edit" : "view");
       badge.textContent = allowed ? "✅ MASTER ENGINEER" : "👁 VIEW ONLY";
     }
-
     function showViewOnlyPanel(){
       document.querySelectorAll(".access-view-panel").forEach(el=>el.remove());
       if(isCurrentEngineerAllowed()) return;
@@ -497,13 +484,12 @@
         });
       }
     }
-
     function requireMasterEngineerAccess(){
       if(isCurrentEngineerAllowed()) return true;
       alert("View only access. Ask Admin to add your name in Testing Engineers list.");
       return false;
     }
-    /* ===== END v6.4.3 MASTER ENGINEER ACCESS CONTROL ===== */
+    /* ===== END v6.4.5 MASTER ENGINEER ACCESS CONTROL ===== */
 
 
     /* ===== v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */

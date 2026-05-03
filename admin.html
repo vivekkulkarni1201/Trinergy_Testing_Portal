@@ -48,60 +48,9 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
       letter-spacing:.04em;
     }
 \n
-    #engineersPanelGuaranteed{
-      margin:22px;
-      padding:18px;
-      border:1px solid #334b75;
-      border-radius:18px;
-      background:#15223b;
-      display:none;
-    }
-    #engineersPanelGuaranteed h2{margin-top:0}
     .engineer-list-card{
-      display:grid;
-      grid-template-columns: 1fr 120px 150px;
-      gap:10px;
-      align-items:center;
-      padding:10px;
-      border:1px solid #334b75;
-      border-radius:12px;
-      margin:8px 0;
-      background:#101c32;
-    }
-    .engineer-pill{font-weight:900;color:#eef5ff}
-    .status-active{color:#29d17d;font-weight:900}
-    .status-inactive{color:#ffd166;font-weight:900}
-    .eng-float-btn{
-      background:#2563eb!important;
-      color:white!important;
-      border:none!important;
-      padding:12px 16px!important;
-      border-radius:14px!important;
-      cursor:pointer!important;
-      font-weight:900!important;
-      margin:10px 8px 10px 22px!important;
-      box-shadow:0 6px 16px rgba(0,0,0,.25)!important;
-    }
-
-
-    #engineersAlwaysVisible{
-      margin:22px;
-      padding:18px;
-      border:1px solid #334b75;
-      border-radius:18px;
-      background:#15223b;
-    }
-    #engineersAlwaysVisible h2{margin-top:0}
-    .engineer-list-card{
-      display:grid;
-      grid-template-columns: 1fr 120px 150px;
-      gap:10px;
-      align-items:center;
-      padding:10px;
-      border:1px solid #334b75;
-      border-radius:12px;
-      margin:8px 0;
-      background:#101c32;
+      display:grid;grid-template-columns:1fr 120px 150px;gap:10px;align-items:center;
+      padding:10px;border:1px solid #334b75;border-radius:12px;margin:8px 0;background:#101c32;
     }
     .engineer-pill{font-weight:900;color:#eef5ff}
     .status-active{color:#29d17d;font-weight:900}
@@ -109,19 +58,15 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-
-
-
-/* ===== v6.4.4 ALWAYS VISIBLE TESTING ENGINEERS PANEL ===== */
+/* ===== v6.4.5 ADMIN TESTING ENGINEERS DIRECT TAB ===== */
 function ensureMasterEngineers(){
   if(typeof state === "undefined") return;
   state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [{name:"Vivek", active:true}];
 }
-
 function renderMasterEngineers(){
   if(typeof state === "undefined") return;
   ensureMasterEngineers();
-  const box = document.getElementById("engineerListAlways");
+  const box = document.getElementById("engineerList");
   if(!box) return;
   box.innerHTML = state.masterEngineers.map((e,i)=>`
     <div class="engineer-list-card">
@@ -134,31 +79,26 @@ function renderMasterEngineers(){
     </div>
   `).join("") || `<p class="muted">No engineers added.</p>`;
 }
-
 function addMasterEngineer(){
   ensureMasterEngineers();
-  const name = (document.getElementById("engNameAlways").value || "").trim();
-  const active = document.getElementById("engStatusAlways").value === "active";
+  const name = (document.getElementById("engName").value || "").trim();
+  const active = document.getElementById("engStatus").value === "active";
   if(!name){ alert("Enter engineer name"); return; }
-
   const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
   if(idx >= 0) state.masterEngineers[idx] = {name, active};
   else state.masterEngineers.push({name, active});
-
   save();
   renderMasterEngineers();
   clearEngineerForm();
   alert("Testing engineer list updated");
 }
-
 function editMasterEngineer(i){
   ensureMasterEngineers();
   const e = state.masterEngineers[i];
   if(!e) return;
-  document.getElementById("engNameAlways").value = e.name;
-  document.getElementById("engStatusAlways").value = e.active!==false ? "active" : "inactive";
+  document.getElementById("engName").value = e.name;
+  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
 }
-
 function deleteMasterEngineer(i){
   ensureMasterEngineers();
   if(!confirm("Delete this engineer?")) return;
@@ -166,59 +106,18 @@ function deleteMasterEngineer(i){
   save();
   renderMasterEngineers();
 }
-
 function clearEngineerForm(){
-  const n = document.getElementById("engNameAlways");
-  const s = document.getElementById("engStatusAlways");
+  const n = document.getElementById("engName");
+  const s = document.getElementById("engStatus");
   if(n) n.value = "";
   if(s) s.value = "active";
 }
-
-function installEngineersAlwaysVisible(){
-  if(document.getElementById("engineersAlwaysVisible")) {
-    renderMasterEngineers();
-    return;
-  }
-
-  const panel = document.createElement("section");
-  panel.id = "engineersAlwaysVisible";
-  panel.innerHTML = `
-    <h2>Testing Engineers Master List</h2>
-    <p class="muted">Only Active names in this list can edit UPS movement, stage, timer and RTA. Other names will be view-only.</p>
-    <div class="grid two">
-      <div>
-        <label>Engineer Name</label>
-        <input id="engNameAlways" placeholder="Example: Vivek">
-      </div>
-      <div>
-        <label>Status</label>
-        <select id="engStatusAlways">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </div>
-    </div>
-    <button onclick="addMasterEngineer()" class="green">Add / Update Engineer</button>
-    <button onclick="clearEngineerForm()" class="orange">Clear</button>
-    <h3>Current Master List</h3>
-    <div id="engineerListAlways"></div>
-  `;
-
-  const cards = document.querySelector(".cards") || document.querySelector(".summary-grid") || document.querySelector("header");
-  if(cards && cards.parentNode){
-    cards.parentNode.insertBefore(panel, cards.nextSibling);
-  } else {
-    document.body.insertBefore(panel, document.body.children[1] || null);
-  }
-
-  ensureMasterEngineers();
-  renderMasterEngineers();
-}
-
-document.addEventListener("DOMContentLoaded", () => setTimeout(installEngineersAlwaysVisible, 500));
-setTimeout(installEngineersAlwaysVisible, 1200);
-setInterval(renderMasterEngineers, 3000);
-/* ===== END v6.4.4 ALWAYS VISIBLE TESTING ENGINEERS PANEL ===== */
+const __oldAdminShowTab = showTab;
+showTab = function(id, btn){
+  __oldAdminShowTab(id, btn);
+  if(id === "engineers") renderMasterEngineers();
+};
+/* ===== END v6.4.5 ADMIN TESTING ENGINEERS DIRECT TAB ===== */
 
 </script>
 </head>
@@ -256,7 +155,36 @@ setInterval(renderMasterEngineers, 3000);
   <button class="tab" onclick="showTab('serials', this)">Serials</button>
   <button class="tab" onclick="showTab('oldserial', this)">Old Serial Re-entry</button>
   <button class="tab" onclick="showTab('reports', this)">Reports</button>
+  <button class="tab" onclick="showTab('engineers', this)">Testing Engineers</button>
 </nav>
+
+
+<section id="engineers" class="tab-content">
+  <div class="panel">
+    <h2>Testing Engineers Master List</h2>
+    <div class="hint">Only Active names in this list can edit UPS movement, stage, timer and RTA. Other names will be view-only.</div>
+
+    <div class="grid two">
+      <div>
+        <label>Engineer Name</label>
+        <input id="engName" placeholder="Example: Vivek">
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="engStatus">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+
+    <button onclick="addMasterEngineer()" class="green">Add / Update Engineer</button>
+    <button onclick="clearEngineerForm()" class="orange">Clear</button>
+
+    <h3>Current Master List</h3>
+    <div id="engineerList"></div>
+  </div>
+</section>
 
 <section id="targets" class="tab-content active">
   <div class="panel">
@@ -1128,7 +1056,7 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();initAdminCloudSync();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
 </body>
 </html>
