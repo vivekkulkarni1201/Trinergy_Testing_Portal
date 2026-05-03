@@ -273,7 +273,45 @@
       font-size:12px;
       letter-spacing:.04em;
     }
-\n</style>
+\n
+    .soft-lock-badge{
+      display:inline-block;
+      margin-left:6px;
+      padding:2px 7px;
+      border-radius:999px;
+      background:rgba(255,193,7,.16);
+      border:1px solid rgba(255,193,7,.55);
+      color:#ffd166;
+      font-size:11px;
+      font-weight:900;
+    }
+    .ups-card.soft-locked-other{
+      opacity:.68;
+      border-left-color:#ffd166 !important;
+      box-shadow:0 0 0 1px rgba(255,193,7,.25);
+    }
+    .soft-lock-panel{
+      margin:10px 0;
+      padding:10px 12px;
+      border-radius:12px;
+      background:rgba(255,193,7,.13);
+      border:1px solid rgba(255,193,7,.45);
+      color:#ffd166;
+      font-weight:900;
+    }
+    .soft-lock-top{
+      display:inline-block;
+      margin-left:10px;
+      padding:5px 10px;
+      border-radius:999px;
+      background:rgba(255,193,7,.12);
+      border:1px solid rgba(255,193,7,.35);
+      color:#ffd166;
+      font-weight:900;
+      font-size:12px;
+    }
+
+</style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -388,6 +426,200 @@
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
 
+    /* ===== v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */
+    const SOFT_LOCK_TIMEOUT_MS = 60000;
+    let SOFT_LOCKS = {};
+    let SOFT_LOCK_ROW_SAVE_TIMER = null;
+
+    function getEngineerName(){
+      let name = localStorage.getItem("trinergyEngineerName");
+      if(!name){
+        name = prompt("Engineer name for edit lock:", "Engineer") || "Engineer";
+        name = name.trim() || "Engineer";
+        localStorage.setItem("trinergyEngineerName", name);
+      }
+      return localStorage.getItem("trinergyEngineerName") || "Engineer";
+    }
+
+    const CURRENT_ENGINEER_NAME = getEngineerName();
+
+    function lockNow(){ return Date.now(); }
+
+    function cleanExpiredLocks(){
+      const t = lockNow();
+      Object.keys(SOFT_LOCKS || {}).forEach(id=>{
+        const l = SOFT_LOCKS[id];
+        if(!l || !l.time || (t - new Date(l.time).getTime()) > SOFT_LOCK_TIMEOUT_MS){
+          delete SOFT_LOCKS[id];
+        }
+      });
+    }
+
+    function getSoftLock(id){
+      cleanExpiredLocks();
+      return SOFT_LOCKS ? SOFT_LOCKS[id] : null;
+    }
+
+    function isSoftLockedByOther(id){
+      const l = getSoftLock(id);
+      if(!l) return false;
+      return String(l.by || "").toLowerCase() !== String(CURRENT_ENGINEER_NAME || "").toLowerCase();
+    }
+
+    function setSoftLock(id){
+      cleanExpiredLocks();
+      if(isSoftLockedByOther(id)){
+        const l = getSoftLock(id);
+        alert("This UPS is currently being edited by " + (l.by || "another engineer") + ". You can view it, but cannot edit.");
+        return false;
+      }
+      SOFT_LOCKS[id] = { by: CURRENT_ENGINEER_NAME, time: new Date().toISOString() };
+      scheduleSoftLockCloudSave();
+      return true;
+    }
+
+    function refreshSoftLockOnAction(){
+      if(!SELECTED_UPS_ID) return;
+      const l = getSoftLock(SELECTED_UPS_ID);
+      if(l && String(l.by || "").toLowerCase() === String(CURRENT_ENGINEER_NAME || "").toLowerCase()){
+        l.time = new Date().toISOString();
+        scheduleSoftLockCloudSave();
+      }
+    }
+
+    function releaseSoftLock(id){
+      if(!id) return;
+      const l = getSoftLock(id);
+      if(l && String(l.by || "").toLowerCase() === String(CURRENT_ENGINEER_NAME || "").toLowerCase()){
+        delete SOFT_LOCKS[id];
+        scheduleSoftLockCloudSave();
+      }
+    }
+
+    async function loadSoftLocksFromCloud(){
+      if(!cloudClient) return;
+      try{
+        const payload = await cloudLoadRow("locks");
+        SOFT_LOCKS = payload && payload.locks ? payload.locks : {};
+        cleanExpiredLocks();
+      }catch(e){ console.warn("Soft lock load failed", e); }
+    }
+
+    function scheduleSoftLockCloudSave(){
+      if(!cloudClient || !CLOUD_READY) return;
+      clearTimeout(SOFT_LOCK_ROW_SAVE_TIMER);
+      SOFT_LOCK_ROW_SAVE_TIMER = setTimeout(()=>{
+        cloudSaveRow("locks", { locks: SOFT_LOCKS, updatedAt:new Date().toISOString() });
+      }, 200);
+    }
+
+    function requireSoftEditAllowed(){
+      if(!SELECTED_UPS_ID) return true;
+      if(isSoftLockedByOther(SELECTED_UPS_ID)){
+        const l = getSoftLock(SELECTED_UPS_ID);
+        alert("Cannot edit. This UPS is locked by " + (l.by || "another engineer"));
+        return false;
+      }
+      setSoftLock(SELECTED_UPS_ID);
+      refreshSoftLockOnAction();
+      return true;
+    }
+
+    function applySoftLockUI(){
+      const title = document.querySelector(".title");
+      if(title && !document.getElementById("softLockUser")){
+        const span = document.createElement("span");
+        span.id = "softLockUser";
+        span.className = "soft-lock-top";
+        span.innerHTML = "👤 " + CURRENT_ENGINEER_NAME;
+        title.appendChild(span);
+      }
+
+      document.querySelectorAll(".ups-card").forEach(card=>{
+        const txt = card.innerText || "";
+        const ups = UPS_LIST.find(u => txt.includes(u.serial));
+        if(!ups) return;
+        const l = getSoftLock(ups.id);
+        if(l){
+          if(String(l.by || "").toLowerCase() !== String(CURRENT_ENGINEER_NAME || "").toLowerCase()){
+            card.classList.add("soft-locked-other");
+          }
+          const serialDiv = card.querySelector(".serial");
+          if(serialDiv && !serialDiv.querySelector(".soft-lock-badge")){
+            const b = document.createElement("span");
+            b.className = "soft-lock-badge";
+            b.textContent = "🔒 " + (String(l.by || "").toLowerCase() === String(CURRENT_ENGINEER_NAME || "").toLowerCase() ? "You" : l.by);
+            serialDiv.appendChild(b);
+          }
+        }
+      });
+
+      if(SELECTED_UPS_ID && isSoftLockedByOther(SELECTED_UPS_ID)){
+        const panel = document.querySelector(".right-col") || document.querySelector(".action-panel") || document.body;
+        if(panel && !panel.querySelector(".soft-lock-panel")){
+          const l = getSoftLock(SELECTED_UPS_ID);
+          const warn = document.createElement("div");
+          warn.className = "soft-lock-panel";
+          warn.textContent = "🔒 View only: locked by " + (l.by || "another engineer");
+          panel.prepend(warn);
+        }
+        panel.querySelectorAll("button,select,input").forEach(el=>{
+          if(el.innerText && el.innerText.includes("Admin")) return;
+          el.disabled = true;
+        });
+      }
+    }
+
+    function installSoftLockWrappers(){
+      if(window.__softLockInstalled) return;
+      window.__softLockInstalled = true;
+
+      const oldSelectUPS = selectUPS;
+      selectUPS = function(id){
+        const oldId = SELECTED_UPS_ID;
+        if(oldId && oldId !== id) releaseSoftLock(oldId);
+
+        // Allow view always. If free or owned, lock it. If locked by other, open view-only.
+        if(!isSoftLockedByOther(id)) setSoftLock(id);
+        oldSelectUPS(id);
+        setTimeout(applySoftLockUI, 0);
+      };
+
+      const wrapNames = [
+        "moveSelectedUPS","updateSelectedStage","returnToAssembly",
+        "moveFromRework","moveToTempHold","moveFromTempHold","markToFinishing",
+        "startTimedEvent","stopTimedEventAndMarkFaulty"
+      ];
+
+      wrapNames.forEach(name=>{
+        try{
+          if(typeof window[name] === "function" && !window[name].__softWrapped){
+            const oldFn = window[name];
+            const wrapped = function(...args){
+              if(!requireSoftEditAllowed()) return;
+              return oldFn.apply(this,args);
+            };
+            wrapped.__softWrapped = true;
+            window[name] = wrapped;
+            eval(name + " = window[name]");
+          }
+        }catch(e){ console.warn("Soft lock wrap skipped", name, e); }
+      });
+    }
+
+    // Activity based only: no automatic refresh.
+    // Any click/change inside action area refreshes current lock.
+    document.addEventListener("click", e=>{
+      if(e.target.closest(".right-col") || e.target.closest(".action-panel")) refreshSoftLockOnAction();
+    });
+    document.addEventListener("change", e=>{
+      if(e.target.closest(".right-col") || e.target.closest(".action-panel")) refreshSoftLockOnAction();
+    });
+
+    window.addEventListener("beforeunload", ()=> releaseSoftLock(SELECTED_UPS_ID));
+    /* ===== END v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */
+
+
     /* ===== v6 CLOUD SYNC - DASHBOARD ===== */
     const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_r81zoMPA57-Na_fdMCgS9g_GN6C876h";
@@ -475,6 +707,7 @@
       }
 
       await loadAdminConfigFromCloudForDashboard();
+      await loadSoftLocksFromCloud();
       const payload = await cloudLoadRow("main");
       if (payload) {
         applyDashboardCloudPayload(payload);
@@ -500,6 +733,11 @@
               localStorage.setItem("trinergyAdminV3", JSON.stringify(payload.new.data));
               render();
             } catch(e) {}
+          }
+          if (rowId === "locks") {
+            SOFT_LOCKS = payload.new && payload.new.data && payload.new.data.locks ? payload.new.data.locks : {};
+            cleanExpiredLocks();
+            render();
           }
         })
         .subscribe();
@@ -1703,6 +1941,7 @@ function renderBaySlots() {
       renderKPIs(); renderStatusBoxes(); renderWaitingArea(); renderReworkArea(); renderTempHoldArea(); renderBaySlots();
       refreshAssignBayDropdownFromAdmin(); renderActionPanel();
       scheduleCloudDashboardSave();
+      setTimeout(applySoftLockUI, 0);
     }
 
     
@@ -1719,6 +1958,8 @@ function renderBaySlots() {
     }
 
 initCloudDashboard();
+setTimeout(installSoftLockWrappers, 800);
+setInterval(applySoftLockUI, 1500);
   </script>
 </body>
 </html>
