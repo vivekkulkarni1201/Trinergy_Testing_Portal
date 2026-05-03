@@ -311,6 +311,39 @@
       font-size:12px;
     }
 
+
+    .access-badge{
+      display:inline-block;
+      margin-left:10px;
+      padding:5px 10px;
+      border-radius:999px;
+      font-weight:900;
+      font-size:12px;
+      letter-spacing:.04em;
+      border:1px solid rgba(168,186,216,.35);
+      background:rgba(168,186,216,.10);
+      color:#a8bad8;
+    }
+    .access-badge.edit{
+      background:rgba(41,209,125,.14);
+      border-color:rgba(41,209,125,.50);
+      color:#29d17d;
+    }
+    .access-badge.view{
+      background:rgba(255,193,7,.13);
+      border-color:rgba(255,193,7,.45);
+      color:#ffd166;
+    }
+    .access-view-panel{
+      margin:10px 0;
+      padding:10px 12px;
+      border-radius:12px;
+      background:rgba(255,193,7,.13);
+      border:1px solid rgba(255,193,7,.45);
+      color:#ffd166;
+      font-weight:900;
+    }
+
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -426,6 +459,72 @@
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
 
+    /* ===== v6.4 MASTER ENGINEER ACCESS CONTROL ===== */
+    let MASTER_ENGINEERS = [];
+
+    function normName(x){
+      return String(x || "").trim().toLowerCase();
+    }
+
+    function getAdminConfigForAccess(){
+      try { return JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}"); }
+      catch(e){ return {}; }
+    }
+
+    function syncMasterEngineersFromAdmin(){
+      const cfg = getAdminConfigForAccess();
+      MASTER_ENGINEERS = Array.isArray(cfg.masterEngineers) ? cfg.masterEngineers : [];
+    }
+
+    function isCurrentEngineerAllowed(){
+      syncMasterEngineersFromAdmin();
+      const me = normName(CURRENT_ENGINEER_NAME);
+      return MASTER_ENGINEERS.some(e => e && e.active !== false && normName(e.name) === me);
+    }
+
+    function getAccessModeText(){
+      return isCurrentEngineerAllowed() ? "EDIT ACCESS" : "VIEW ONLY";
+    }
+
+    function updateAccessBadge(){
+      const title = document.querySelector(".title");
+      if(!title) return;
+      let badge = document.getElementById("accessBadge");
+      if(!badge){
+        badge = document.createElement("span");
+        badge.id = "accessBadge";
+        title.appendChild(badge);
+      }
+      const allowed = isCurrentEngineerAllowed();
+      badge.className = "access-badge " + (allowed ? "edit" : "view");
+      badge.textContent = allowed ? "✅ MASTER ENGINEER" : "👁 VIEW ONLY";
+    }
+
+    function showViewOnlyPanel(){
+      if(isCurrentEngineerAllowed()) return;
+      const panel = document.querySelector(".right-col") || document.querySelector(".action-panel") || document.body;
+      if(panel && !panel.querySelector(".access-view-panel")){
+        const warn = document.createElement("div");
+        warn.className = "access-view-panel";
+        warn.textContent = "👁 View only: your name is not in Admin → Master Testing Engineer list.";
+        panel.prepend(warn);
+      }
+      if(panel){
+        panel.querySelectorAll("button,select,input").forEach(el=>{
+          if(el.innerText && el.innerText.includes("Admin")) return;
+          el.disabled = true;
+        });
+      }
+    }
+
+    function requireMasterEngineerAccess(){
+      if(isCurrentEngineerAllowed()) return true;
+      alert("View only access. Ask Admin to add your name in Master Testing Engineer list.");
+      return false;
+    }
+    /* ===== END v6.4 MASTER ENGINEER ACCESS CONTROL ===== */
+
+
     /* ===== v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */
     const SOFT_LOCK_TIMEOUT_MS = 60000;
     let SOFT_LOCKS = {};
@@ -517,6 +616,7 @@
     }
 
     function requireSoftEditAllowed(){
+      if(!requireMasterEngineerAccess()) return false;
       if(!SELECTED_UPS_ID) return true;
       if(isSoftLockedByOther(SELECTED_UPS_ID)){
         const l = getSoftLock(SELECTED_UPS_ID);
@@ -593,10 +693,14 @@
         const oldId = SELECTED_UPS_ID;
         if(oldId && oldId !== id) releaseSoftLock(oldId);
 
-        // Allow view always. If free or owned, lock it. If locked by other, open view-only.
-        if(!isSoftLockedByOther(id)) setSoftLock(id);
+        // Allow view always. Only authorized master engineers can take edit lock.
+        if(isCurrentEngineerAllowed() && !isSoftLockedByOther(id)) setSoftLock(id);
         oldSelectUPS(id);
         setTimeout(applySoftLockUI, 0);
+      setTimeout(updateAccessBadge, 0);
+      setTimeout(showViewOnlyPanel, 0);
+        setTimeout(showViewOnlyPanel, 0);
+        setTimeout(updateAccessBadge, 0);
       };
 
       const wrapNames = [
@@ -746,6 +850,8 @@
             try {
               localStorage.setItem("trinergyAdminV3", JSON.stringify(payload.new.data));
               render();
+              updateAccessBadge();
+              showViewOnlyPanel();
             } catch(e) {}
           }
           if (rowId === "locks") {
@@ -1974,6 +2080,10 @@ function renderBaySlots() {
 initCloudDashboard();
 setTimeout(installSoftLockWrappers, 800);
 setInterval(applySoftLockUI, 1500);
+setTimeout(updateAccessBadge, 1000);
+setTimeout(showViewOnlyPanel, 1000);
+setInterval(updateAccessBadge, 2000);
+setInterval(showViewOnlyPanel, 2000);
 
     /* v6.3_AUTO_LOCK_CLEANUP: auto remove expired lock UI without user click */
     setInterval(() => {

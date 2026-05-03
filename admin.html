@@ -47,8 +47,93 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
       font-size:12px;
       letter-spacing:.04em;
     }
-\n</style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+\n
+    .engineer-list-card{
+      display:grid;
+      grid-template-columns: 1fr 140px 110px;
+      gap:10px;
+      align-items:center;
+      padding:10px;
+      border:1px solid #334b75;
+      border-radius:12px;
+      margin:8px 0;
+      background:#101c32;
+    }
+    .engineer-pill{
+      font-weight:900;
+      color:#eef5ff;
+    }
+    .status-active{color:#29d17d;font-weight:900}
+    .status-inactive{color:#ffd166;font-weight:900}
+
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+/* ===== v6.4 ADMIN MASTER ENGINEERS ===== */
+function ensureMasterEngineers(){
+  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [
+    {name:"Vivek", active:true}
+  ];
+}
+
+function renderMasterEngineers(){
+  ensureMasterEngineers();
+  const box = document.getElementById("engineerList");
+  if(!box) return;
+  box.innerHTML = state.masterEngineers.map((e,i)=>`
+    <div class="engineer-list-card">
+      <div class="engineer-pill">${e.name}</div>
+      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
+      <div>
+        <button onclick="editMasterEngineer(${i})">Edit</button>
+        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
+      </div>
+    </div>
+  `).join("") || `<p class="muted">No master engineers added.</p>`;
+}
+
+function addMasterEngineer(){
+  ensureMasterEngineers();
+  const name = (document.getElementById("engName").value || "").trim();
+  const active = document.getElementById("engStatus").value === "active";
+  if(!name){ alert("Enter engineer name"); return; }
+
+  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
+  if(idx >= 0){
+    state.masterEngineers[idx] = {name, active};
+  } else {
+    state.masterEngineers.push({name, active});
+  }
+  save();
+  renderMasterEngineers();
+  clearEngineerForm();
+  alert("Master engineer list updated");
+}
+
+function editMasterEngineer(i){
+  ensureMasterEngineers();
+  const e = state.masterEngineers[i];
+  if(!e) return;
+  document.getElementById("engName").value = e.name;
+  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
+}
+
+function deleteMasterEngineer(i){
+  ensureMasterEngineers();
+  if(!confirm("Delete this engineer from master list?")) return;
+  state.masterEngineers.splice(i,1);
+  save();
+  renderMasterEngineers();
+}
+
+function clearEngineerForm(){
+  const n = document.getElementById("engName");
+  const s = document.getElementById("engStatus");
+  if(n) n.value = "";
+  if(s) s.value = "active";
+}
+/* ===== END v6.4 ADMIN MASTER ENGINEERS ===== */
+
+</script>
 </head>
 <body>
 <div class="login-overlay" id="loginOverlay">
@@ -216,6 +301,34 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
   </div>
 </div></section>
 
+
+    <section id="engineers" class="tab-section" style="display:none;">
+      <div class="card">
+        <h2>Master Testing Engineers</h2>
+        <p class="muted">Only active names in this list can edit UPS status, stages, movement, timer and RTA. Others will be view-only.</p>
+
+        <div class="grid two">
+          <div>
+            <label>Engineer Name</label>
+            <input id="engName" placeholder="Example: Vivek">
+          </div>
+          <div>
+            <label>Status</label>
+            <select id="engStatus">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="addMasterEngineer()" class="green">Add / Update Engineer</button>
+        <button onclick="clearEngineerForm()" class="orange">Clear</button>
+
+        <h3>Current Master List</h3>
+        <div id="engineerList"></div>
+      </div>
+    </section>
+
 </main>
 <div class="toast" id="toast"></div>
 
@@ -290,6 +403,7 @@ async function initAdminCloudSync(){
     state.stages=state.stages||[];
     state.serials=state.serials||{T3X:42,T2X:18,TST:9};
     state.oldSerials=state.oldSerials||[];
+state.masterEngineers=Array.isArray(state.masterEngineers)?state.masterEngineers:[{name:'Vivek',active:true}];
     state.timers=state.timers||{mode:"TEST MODE",coreTest:1,tstTest:1,boostTest:1,coreReal:240,tstReal:60,boostReal:30};
     localStorage.setItem("trinergyAdminV3", JSON.stringify(state));
     rerenderAdminAfterCloud();
@@ -358,6 +472,7 @@ state.stages=state.stages||[
 ];
 state.serials=state.serials||{T3X:42,T2X:18,TST:9};
 state.oldSerials=state.oldSerials||[];
+state.masterEngineers=Array.isArray(state.masterEngineers)?state.masterEngineers:[{name:'Vivek',active:true}];
 state.timers=state.timers||{mode:"TEST MODE",coreTest:1,tstTest:1,boostTest:1,coreReal:240,tstReal:60,boostReal:30};
 
 if(state.targets.length && !state.monthlyTargets.length && !state.weeklyTargets.length){
@@ -954,7 +1069,73 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();initAdminCloudSync();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
+
+/* ===== v6.4 ADMIN MASTER ENGINEERS ===== */
+function ensureMasterEngineers(){
+  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [
+    {name:"Vivek", active:true}
+  ];
+}
+
+function renderMasterEngineers(){
+  ensureMasterEngineers();
+  const box = document.getElementById("engineerList");
+  if(!box) return;
+  box.innerHTML = state.masterEngineers.map((e,i)=>`
+    <div class="engineer-list-card">
+      <div class="engineer-pill">${e.name}</div>
+      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
+      <div>
+        <button onclick="editMasterEngineer(${i})">Edit</button>
+        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
+      </div>
+    </div>
+  `).join("") || `<p class="muted">No master engineers added.</p>`;
+}
+
+function addMasterEngineer(){
+  ensureMasterEngineers();
+  const name = (document.getElementById("engName").value || "").trim();
+  const active = document.getElementById("engStatus").value === "active";
+  if(!name){ alert("Enter engineer name"); return; }
+
+  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
+  if(idx >= 0){
+    state.masterEngineers[idx] = {name, active};
+  } else {
+    state.masterEngineers.push({name, active});
+  }
+  save();
+  renderMasterEngineers();
+  clearEngineerForm();
+  alert("Master engineer list updated");
+}
+
+function editMasterEngineer(i){
+  ensureMasterEngineers();
+  const e = state.masterEngineers[i];
+  if(!e) return;
+  document.getElementById("engName").value = e.name;
+  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
+}
+
+function deleteMasterEngineer(i){
+  ensureMasterEngineers();
+  if(!confirm("Delete this engineer from master list?")) return;
+  state.masterEngineers.splice(i,1);
+  save();
+  renderMasterEngineers();
+}
+
+function clearEngineerForm(){
+  const n = document.getElementById("engName");
+  const s = document.getElementById("engStatus");
+  if(n) n.value = "";
+  if(s) s.value = "active";
+}
+/* ===== END v6.4 ADMIN MASTER ENGINEERS ===== */
+
 </script>
 </body>
 </html>
