@@ -34,25 +34,33 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 .login-card h2{margin:0 0 10px}.login-card p{color:#a8bad8;margin:0 0 14px}.login-card button{margin-top:12px;width:100%}
 .login-error{color:#ff9a9a;font-weight:800;margin-top:10px;display:none}
 @media(max-width:1000px){.form-grid,.mini-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.form-grid,.mini-grid{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start;gap:12px}}
-.cloud-badge{display:inline-block;margin-left:10px;padding:5px 10px;border-radius:999px;background:rgba(41,209,125,.14);border:1px solid rgba(41,209,125,.5);color:#29d17d;font-weight:900;font-size:12px;letter-spacing:.04em;}
-</style>
+
+    .cloud-badge{
+      display:inline-block;
+      margin-left:10px;
+      padding:5px 10px;
+      border-radius:999px;
+      background:rgba(41,209,125,.14);
+      border:1px solid rgba(41,209,125,.5);
+      color:#29d17d;
+      font-weight:900;
+      font-size:12px;
+      letter-spacing:.04em;
+    }
+\n</style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
     <h2>Admin Login</h2>
-    <p>Admin role required to access configuration page.</p>
-    <input id="loginUser" placeholder="Username" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
-    <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
-    <button onclick="doLogin()">Login</button>
-    <div class="login-error" id="loginError">Invalid admin login</div>
-    <p style="font-size:12px;margin-top:14px;">Default admin: <b>admin/admin123</b></p>
+    <p>Enter admin password to access configuration page.</p>
+    <input id="adminPasswordInput" type="password" placeholder="Admin Password" onkeydown="if(event.key==='Enter') checkAdminPassword()">
+    <button class="success" onclick="checkAdminPassword()">Unlock Admin</button>
+    <div class="login-error" id="loginError">Wrong password</div>
+    <p style="font-size:12px;margin-top:14px;">Default password: <b>admin123</b></p>
   </div>
 </div>
-
-
 
 <header class="topbar">
   <div class="brand"><div class="logo">VERTIV</div><div><div class="title">TRINERGY ADMIN CONTROL PANEL <span class="cloud-badge">● CLOUD LIVE</span></div><div class="subtitle">LIVE CLOUD ADMIN - Realtime Configuration</div></div></div>
@@ -62,7 +70,7 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 <main class="page">
 <section class="mini-grid">
   <div class="mini-card"><div class="mini-title">Dashboard Status</div><div class="mini-value">Locked</div><div class="mini-sub">Dashboard connected live</div></div>
-  <div class="mini-card"><div class="mini-title">Admin Mode</div><div class="mini-value">Local</div><div class="mini-sub">Supabase realtime</div></div>
+  <div class="mini-card"><div class="mini-title">Admin Mode</div><div class="mini-value">Cloud</div><div class="mini-sub">Supabase realtime</div></div>
   <div class="mini-card"><div class="mini-title">Target Rows</div><div class="mini-value" id="targetCount">0</div><div class="mini-sub">Monthly + weekly</div></div>
   <div class="mini-card"><div class="mini-title">Masters</div><div class="mini-value">Ready</div><div class="mini-sub">Bays and stages</div></div>
 </section>
@@ -213,58 +221,6 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 
 <script>
 
-/* ===== v6.4 ADMIN LOGIN + ROLE SYSTEM ===== */
-const TRINERGY_USERS = [
-  { username:"admin", password:"admin123", role:"admin", display:"Admin" },
-  { username:"vivek", password:"1234", role:"engineer", display:"Vivek" },
-  { username:"engineer1", password:"1234", role:"engineer", display:"Engineer 1" },
-  { username:"engineer2", password:"1234", role:"engineer", display:"Engineer 2" },
-  { username:"viewer", password:"view", role:"viewer", display:"Viewer" }
-];
-let CURRENT_USER = null;
-function normalizeUserName(x){ return String(x || "").trim().toLowerCase(); }
-function getSavedSession(){ try{return JSON.parse(localStorage.getItem("trinergyLoginSession")||"null")}catch(e){return null} }
-function saveSession(user){ localStorage.setItem("trinergyLoginSession", JSON.stringify(user)); }
-function clearSession(){ localStorage.removeItem("trinergyLoginSession"); }
-function doLogin(){
-  const u=normalizeUserName(document.getElementById("loginUser").value);
-  const p=document.getElementById("loginPass").value;
-  const found=TRINERGY_USERS.find(x=>normalizeUserName(x.username)===u && x.password===p);
-  if(!found || found.role!=="admin"){
-    document.getElementById("loginError").style.display="block";
-    return;
-  }
-  CURRENT_USER={username:found.username,role:found.role,display:found.display||found.username};
-  saveSession(CURRENT_USER);
-  applyLoginState();
-}
-function logout(){ clearSession(); location.reload(); }
-function applyLoginState(){
-  const session=getSavedSession();
-  if(session && session.role==="admin"){
-    CURRENT_USER=session;
-    const overlay=document.getElementById("loginOverlay");
-    if(overlay) overlay.style.display="none";
-  } else {
-    const overlay=document.getElementById("loginOverlay");
-    if(overlay) overlay.style.display="flex";
-  }
-  updateUserBadge();
-}
-function updateUserBadge(){
-  const existing=document.getElementById("userBadge");
-  if(existing) existing.remove();
-  if(!CURRENT_USER) return;
-  const target=document.querySelector(".title")||document.querySelector(".brand")||document.body;
-  const badge=document.createElement("span");
-  badge.id="userBadge";
-  badge.className="user-badge";
-  badge.innerHTML=`👤 ${CURRENT_USER.display} (${CURRENT_USER.role}) <button class="logout-btn" onclick="logout()">Logout</button>`;
-  target.appendChild(badge);
-}
-/* ===== END v6.4 ADMIN LOGIN + ROLE SYSTEM ===== */
-
-
 /* ===== v6 CLOUD SYNC - ADMIN ===== */
 const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_r81zoMPA57-Na_fdMCgS9g_GN6C876h";
@@ -358,7 +314,9 @@ async function initAdminCloudSync(){
 }
 /* ===== END v6 CLOUD SYNC - ADMIN ===== */
 
-
+const ADMIN_PASSWORD="admin123";
+function checkAdminPassword(){const i=document.getElementById("adminPasswordInput"),e=document.getElementById("loginError");if(i.value===ADMIN_PASSWORD){sessionStorage.setItem("trinergyAdminUnlocked","yes");document.getElementById("loginOverlay").style.display="none"}else e.style.display="block"}
+function applyAdminLock(){if(sessionStorage.getItem("trinergyAdminUnlocked")==="yes")document.getElementById("loginOverlay").style.display="none"}
 
 const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const bayRoleMap={CORE:{sections:"LV + HV",ups:"T3X / T2X",role:"CORE"},"STS TEST":{sections:"Single",ups:"TST",role:"STS TEST"},"STS HEATRUN":{sections:"Single",ups:"TST",role:"STS HEATRUN"}};
@@ -996,7 +954,7 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyLoginState();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();initAdminCloudSync();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
 </body>
 </html>

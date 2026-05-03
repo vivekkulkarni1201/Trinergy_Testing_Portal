@@ -261,62 +261,8 @@
     }
 
 
-    .cloud-badge{display:inline-block;margin-left:10px;padding:5px 10px;border-radius:999px;background:rgba(41,209,125,.14);border:1px solid rgba(41,209,125,.5);color:#29d17d;font-weight:900;font-size:12px;letter-spacing:.04em;}
-    .lock-badge{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:rgba(255,193,7,.16);border:1px solid rgba(255,193,7,.55);color:#ffd166;font-size:11px;font-weight:900;}
-    .ups-card.locked-by-other{opacity:.62;filter:saturate(.75);border-left-color:#ffd166 !important;cursor:not-allowed;}
-    .lock-warning{background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.45);color:#ffd166;padding:10px 12px;border-radius:12px;margin:10px 0;font-weight:800;}
-
-
-    .login-overlay{
-      position:fixed;
-      inset:0;
-      background:rgba(5,10,20,.96);
-      z-index:9999;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-    .login-card{
-      width:min(430px,92vw);
-      background:#15223b;
-      border:1px solid #334b75;
-      border-radius:18px;
-      padding:22px;
-      box-shadow:0 18px 60px rgba(0,0,0,.45);
-    }
-    .login-card h2{margin:0 0 8px}
-    .login-card p{color:#a8bad8;margin:0 0 14px;line-height:1.4}
-    .login-card input,.login-card select{
-      width:100%;
-      margin-top:8px;
-      padding:12px;
-      background:#0f1a2f;
-      color:#eef5ff;
-      border:1px solid #334b75;
-      border-radius:10px;
-      font-size:14px;
-    }
-    .login-card button{
-      margin-top:12px;
-      width:100%;
-      border:0;
-      border-radius:10px;
-      padding:12px;
-      font-weight:900;
-      color:white;
-      cursor:pointer;
-      background:#ff6600;
-    }
-    .login-error{
-      color:#ff9a9a;
-      font-weight:800;
-      margin-top:10px;
-      display:none;
-    }
-    .user-badge{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
+    .cloud-badge{
+      display:inline-block;
       margin-left:10px;
       padding:5px 10px;
       border-radius:999px;
@@ -327,47 +273,10 @@
       font-size:12px;
       letter-spacing:.04em;
     }
-    .logout-btn{
-      background:#b73131!important;
-      color:white!important;
-      border:none!important;
-      padding:6px 10px!important;
-      border-radius:999px!important;
-      cursor:pointer!important;
-      font-size:11px!important;
-      font-weight:900!important;
-      margin-left:4px!important;
-      width:auto!important;
-    }
-    .viewer-warning{
-      background:rgba(255,193,7,.12);
-      border:1px solid rgba(255,193,7,.45);
-      color:#ffd166;
-      padding:10px 12px;
-      border-radius:12px;
-      margin:10px 0;
-      font-weight:800;
-    }
-
-</style>
+\n</style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
-<div class="login-overlay" id="loginOverlay">
-  <div class="login-card">
-    <h2>Trinergy Portal Login</h2>
-    <p>Engineer login required. Session will be remembered on this browser.</p>
-    <input id="loginUser" placeholder="Username" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
-    <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
-    <button onclick="doLogin()">Login</button>
-    <div class="login-error" id="loginError">Invalid username or password</div>
-    <p style="font-size:12px;margin-top:14px;">
-      Demo users: <b>engineer1/1234</b>, <b>engineer2/1234</b>, <b>viewer/view</b>, <b>admin/admin123</b>
-    </p>
-  </div>
-</div>
-
   <!-- ADMIN CONNECTION ACTIVE: reads trinergyAdminV3 from localStorage for targets and timers -->
   <header class="topbar">
     <div class="brand">
@@ -477,133 +386,7 @@
   <script>
     let UPS_LIST = [];
     let SELECTED_UPS_ID = null;
-
-    /* ===== v6.5 SELECTED UPS HELPER FIX ===== */
-    function getSelectedUPS() {
-      if (!SELECTED_UPS_ID) return null;
-      return UPS_LIST.find(u => u.id === SELECTED_UPS_ID) || null;
-    }
-
-    function clearSelectedUPS() {
-      SELECTED_UPS_ID = null;
-    }
-    /* ===== END v6.5 SELECTED UPS HELPER FIX ===== */
-
-
-    
-    /* ===== v6.4 LOGIN + ROLE SYSTEM ===== */
-    const TRINERGY_USERS = [
-      { username:"admin", password:"admin123", role:"admin", display:"Admin" },
-      { username:"vivek", password:"1234", role:"engineer", display:"Vivek" },
-      { username:"engineer1", password:"1234", role:"engineer", display:"Engineer 1" },
-      { username:"engineer2", password:"1234", role:"engineer", display:"Engineer 2" },
-      { username:"viewer", password:"view", role:"viewer", display:"Viewer" }
-    ];
-
-    let CURRENT_USER = null;
-
-    function normalizeUserName(x){ return String(x || "").trim().toLowerCase(); }
-
-    function getSavedSession(){
-      try { return JSON.parse(localStorage.getItem("trinergyLoginSession") || "null"); }
-      catch(e){ return null; }
-    }
-
-    function saveSession(user){
-      localStorage.setItem("trinergyLoginSession", JSON.stringify(user));
-    }
-
-    function clearSession(){
-      localStorage.removeItem("trinergyLoginSession");
-    }
-
-    function doLogin(){
-      const u = normalizeUserName(document.getElementById("loginUser").value);
-      const p = document.getElementById("loginPass").value;
-      const found = TRINERGY_USERS.find(x => normalizeUserName(x.username) === u && x.password === p);
-      if(!found){
-        document.getElementById("loginError").style.display = "block";
-        return;
-      }
-      CURRENT_USER = { username: found.username, role: found.role, display: found.display || found.username };
-      saveSession(CURRENT_USER);
-      applyLoginState();
-      render();
-    }
-
-    function logout(){
-      clearSession();
-      location.reload();
-    }
-
-    function applyLoginState(){
-      const session = getSavedSession();
-      if(session){
-        CURRENT_USER = session;
-        const overlay = document.getElementById("loginOverlay");
-        if(overlay) overlay.style.display = "none";
-      } else {
-        const overlay = document.getElementById("loginOverlay");
-        if(overlay) overlay.style.display = "flex";
-      }
-      updateUserBadge();
-    }
-
-    function isLoggedIn(){ return !!CURRENT_USER; }
-    function isViewer(){ return CURRENT_USER && CURRENT_USER.role === "viewer"; }
-    function canEdit(){ return CURRENT_USER && (CURRENT_USER.role === "engineer" || CURRENT_USER.role === "admin"); }
-
-    function updateUserBadge(){
-      const existing = document.getElementById("userBadge");
-      if(existing) existing.remove();
-      if(!CURRENT_USER) return;
-      const target = document.querySelector(".title") || document.querySelector(".brand") || document.body;
-      const badge = document.createElement("span");
-      badge.id = "userBadge";
-      badge.className = "user-badge";
-      badge.innerHTML = `👤 ${CURRENT_USER.display} (${CURRENT_USER.role}) <button class="logout-btn" onclick="logout()">Logout</button>`;
-      target.appendChild(badge);
-    }
-    /* ===== END v6.4 LOGIN + ROLE SYSTEM ===== */
-
     let isProcessing = false;
-
-    /* ===== v6.2 UPS EDIT LOCK ===== */
-    const LOCK_TIMEOUT_MS = 60000;
-    let CLIENT_ID = "guest";
-    let CLIENT_NAME = "Guest";
-    
-    function getLockIdentity(){
-      if(CURRENT_USER){
-        return {
-          id: normalizeUserName(CURRENT_USER.username),
-          name: CURRENT_USER.display || CURRENT_USER.username,
-          role: CURRENT_USER.role
-        };
-      }
-      return { id:"guest", name:"Guest", role:"viewer" };
-    }
-
-    function nowMs(){ return Date.now(); }
-    function isLockActive(u){ return !!(u && u.lockedBy && u.lockTime && (nowMs() - new Date(u.lockTime).getTime()) < LOCK_TIMEOUT_MS); }
-    function isLockedByOther(u){
-      if(!isLockActive(u)) return false;
-      const ident = getLockIdentity();
-      return normalizeUserName(u.lockedBy) !== normalizeUserName(ident.id);
-    }
-    function refreshLock(u){
-      const ident = getLockIdentity();
-      if(u && normalizeUserName(u.lockedBy) === normalizeUserName(ident.id)){
-        u.lockTime = new Date().toISOString();
-      }
-    }
-    setInterval(() => {
-      const u = (typeof getSelectedUPS === "function") ? getSelectedUPS() : null;
-      if(u && u.lockedBy === CLIENT_ID){ refreshLock(u); if(typeof scheduleCloudDashboardSave === "function") scheduleCloudDashboardSave(); }
-    }, 20000);
-    window.addEventListener("beforeunload", () => { const u = (typeof getSelectedUPS === "function") ? getSelectedUPS() : null; if(u) releaseLock(u); });
-    /* ===== END v6.2 UPS EDIT LOCK ===== */
-
 
     /* ===== v6 CLOUD SYNC - DASHBOARD ===== */
     const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
@@ -1052,26 +835,19 @@
     }
 
     function getUPSById(id) { return UPS_LIST.find(u => u.id === id); }
-    function selectUPS(id) {
-      const oldUps = getSelectedUPS ? getSelectedUPS() : null;
-      if (oldUps && oldUps.id !== id) releaseLock(oldUps);
+    function selectUPS(id) { SELECTED_UPS_ID = id; render();
+      setTimeout(finalSyncStageDropdownFromChecklist, 0); }
+    function getSelectedUPS() { return getUPSById(SELECTED_UPS_ID); }
+    function isTimedRunning(ups) { return !!(ups && ups.timer && ups.timer.running); }
+    function isOccupiedCoreSlot(bay, slot, ignoreId = null) { return UPS_LIST.some(u => u.id !== ignoreId && !u.toFinishing && !u.rework && !u.tempHold && u.locationType === "CORE" && u.bay === bay && u.slot === slot); }
+    function isOccupiedSTS(bay, ignoreId = null) { return UPS_LIST.some(u => u.id !== ignoreId && !u.toFinishing && !u.rework && !u.tempHold && u.locationType === "STS" && u.bay === bay); }
 
-      const newUps = UPS_LIST.find(u => u.id === id);
-      if (!newUps) return;
-
-      SELECTED_UPS_ID = id;
-
-      if (canEdit()) {
-        if (!setLock(newUps)) {
-          render();
-          setTimeout(applyLockReadOnlyUI, 0);
-          return;
-        }
-      }
-
-      render();
-      setTimeout(finalSyncStageDropdownFromChecklist, 0);
-      setTimeout(applyLockReadOnlyUI, 0);
+    function getAllowedMoveTargets(ups) {
+      if (!ups) return [];
+      if (ups.type === "TST") return [{ bay: "STS TEST", slot: "" }, { bay: "STS HEATRUN", slot: "" }];
+      const targets = [];
+      getCoreBayNames().forEach(bay => CORE_SLOTS.forEach(slot => targets.push({ bay, slot })));
+      return targets;
     }
 
     function updateMoveSlotOptions() {
@@ -1129,7 +905,6 @@
     function moveSelectedToTempHold() {
       const ups = getSelectedUPS();
       if (!ups) return;
-      if (!requireEditLock()) return;
 
       if (isTimedRunning(ups)) {
         alert("Cannot move to Temporary Holding while timed event is running");
@@ -1196,7 +971,6 @@
     function updateSelectedStage() {
       const ups = getSelectedUPS();
       if (!ups) return;
-      if (!requireEditLock()) return;
       if (isTimedRunning(ups)) return alert("This UPS is locked while timed event is running");
       const stage = document.getElementById("stageSelect").value;
       if (isTimedStageName(stage)) {
@@ -1218,7 +992,6 @@
     function markToFinishing() {
       const ups = getSelectedUPS();
       if (!ups) return;
-      if (!requireEditLock()) return;
       if (!canMarkToFinishing(ups)) return alert("All required tests must be completed, UPS must not be in Rework/Temporary Hold, and no timed event should be running");
       ups.toFinishing = true;
       ups.completedDate = new Date().toISOString();
@@ -1228,7 +1001,6 @@
       ups.slot = null;
       ups.tempHold = false;
       ups.rework = false;
-      releaseLock(ups);
       SELECTED_UPS_ID = null;
       render();
     }
@@ -1236,7 +1008,6 @@
     function returnToAssembly() {
       const ups = getSelectedUPS();
       if (!ups) return;
-      if (!requireEditLock()) return;
       if (isTimedRunning(ups)) return alert("This UPS is locked while timed event is running");
       ups.rework = true;
       ups.everReturned = true;
@@ -1246,7 +1017,6 @@
       ups.bay = null;
       ups.slot = null;
       ups.tempHold = false;
-      releaseLock(ups);
       SELECTED_UPS_ID = null;
       render();
     }
@@ -1282,7 +1052,6 @@
 function startTimedEvent(eventKey) {
       const ups = getSelectedUPS();
       if (!ups) return;
-      if (!requireEditLock()) return;
 
       if (isTimedRunning(ups)) {
         alert("This UPS already has a timed event running");
@@ -1523,15 +1292,13 @@ function renderWaitingArea() {
 
 function renderUPSCard(u) {
       syncChecklistWithAdminStages(u);
-      const lockClass = isLockedByOther(u) ? "locked-by-other" : "";
-      const lockBadge = isLockActive(u) ? `<span class="lock-badge">🔒 ${u.lockedBy === CLIENT_ID ? "You" : (u.lockedByName || "Locked")}</span>` : "";
       const selectedClass = SELECTED_UPS_ID === u.id ? "selected" : "";
       let timedInfo = "";
       if (u.timer && u.timer.running) timedInfo = `<div class="badge badge-running" data-timer-ups-id="${u.id}" data-timer-mode="card">${u.timer.label}: ${formatRemaining(u.timer.endsAt - Date.now())}</div>`;
       else if (u.type !== "TST" && u.slot === "HV") timedInfo = Object.entries(u.checklist.HEATRUN).map(([k, v]) => `<div class="tiny">${k}: ${v ? "Done" : "Pending"}</div>`).join("");
       const rtaClass = u.everReturned || u.rework ? "rta-history" : "";
       const rtaBadge = u.everReturned || u.rework ? `<span class="rta-badge">RTA</span>` : "";
-      return `<div class="ups-card ${selectedClass} ${rtaClass} ${lockClass}" onclick="selectUPS('${u.id}')"><div class="serial">${u.serial}${rtaBadge}${lockBadge}</div><div class="weektag">${u.weekTag}</div><div class="meta">Type: ${u.type}</div><div class="meta">Stage: ${u.stage || "Not Started"}</div>${timedInfo}${renderProgressHTML(u)}</div>`;
+      return `<div class="ups-card ${selectedClass} ${rtaClass}" onclick="selectUPS('${u.id}')"><div class="serial">${u.serial}${rtaBadge}</div><div class="weektag">${u.weekTag}</div><div class="meta">Type: ${u.type}</div><div class="meta">Stage: ${u.stage || "Not Started"}</div>${timedInfo}${renderProgressHTML(u)}</div>`;
     }
 
     
@@ -1732,7 +1499,6 @@ function renderBaySlots() {
     function moveSelectedToTempHold() {
       const ups = getSelectedUPS();
       if (!ups) return;
-      if (!requireEditLock()) return;
 
       if (isTimedRunning(ups)) {
         alert("Cannot move to Temporary Holding while timed event is running");
@@ -1863,13 +1629,12 @@ function renderBaySlots() {
       const panel = document.getElementById("actionPanel");
       if (!ups) { noSel.classList.remove("hidden"); panel.classList.add("hidden"); return; }
       noSel.classList.add("hidden"); panel.classList.remove("hidden");
-      const isViewOnlyLocked = isLockedByOther(ups);
 
       const previousMoveBay = document.getElementById("moveBay") ? document.getElementById("moveBay").value : "";
       const previousMoveSlot = document.getElementById("moveSlot") ? document.getElementById("moveSlot").value : "";
 
       const locationText = ups.locationType === "WAITING" ? "Waiting for Assignment" : ups.locationType === "REWORK" ? "Rework Holding Area" : ups.locationType === "TEMP" ? "Temporary Holding Area" : ups.locationType === "CORE" ? `${ups.bay} ${ups.slot}` : ups.locationType === "STS" ? ups.bay : "Finished";
-      document.getElementById("selectedDetails").innerHTML = `${isViewOnlyLocked ? `<div class="lock-warning">🔒 View only: locked by <b>${ups.lockedByName || ups.lockedBy}</b></div>` : ""}<div class="detail-item"><b>UPS ID</b><br>${ups.serial}</div><div class="detail-item"><b>Week Tag</b><br>${ups.weekTag}</div><div class="detail-item"><b>Type</b><br>${ups.type}</div><div class="detail-item"><b>Location</b><br>${locationText}</div><div class="detail-item"><b>Current Stage</b><br>${ups.stage || "Not Started"}</div><div class="detail-item"><b>Timer</b><br>${ups.timer && ups.timer.running ? `<span data-timer-ups-id="${ups.id}" data-timer-mode="panel">${ups.timer.label} (${formatRemaining(ups.timer.endsAt - Date.now())})</span>` : "None"}</div>`;
+      document.getElementById("selectedDetails").innerHTML = `<div class="detail-item"><b>UPS ID</b><br>${ups.serial}</div><div class="detail-item"><b>Week Tag</b><br>${ups.weekTag}</div><div class="detail-item"><b>Type</b><br>${ups.type}</div><div class="detail-item"><b>Location</b><br>${locationText}</div><div class="detail-item"><b>Current Stage</b><br>${ups.stage || "Not Started"}</div><div class="detail-item"><b>Timer</b><br>${ups.timer && ups.timer.running ? `<span data-timer-ups-id="${ups.id}" data-timer-mode="panel">${ups.timer.label} (${formatRemaining(ups.timer.endsAt - Date.now())})</span>` : "None"}</div>`;
 
       const moveBay = document.getElementById("moveBay");
       moveBay.innerHTML = "";
@@ -1930,10 +1695,6 @@ function renderBaySlots() {
       document.getElementById("toFinishingBtn").disabled = !canMarkToFinishing(ups);
       document.getElementById("tempHoldBtn").style.display = "inline-block";
       applyTimedLockUI(ups);
-      if (isViewOnlyLocked) {
-        ["moveBay","moveSlot","stageSelect"].forEach(id => { const el=document.getElementById(id); if(el) el.disabled=true; });
-        document.querySelectorAll("#actionPanel button").forEach(btn => btn.disabled = true);
-      }
     
       finalSyncStageDropdownFromChecklist();
     }
@@ -1957,7 +1718,6 @@ function renderBaySlots() {
       render();
     }
 
-applyLoginState();
 initCloudDashboard();
   </script>
 </body>
