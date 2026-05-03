@@ -459,12 +459,10 @@
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
 
-    /* ===== v6.4 MASTER ENGINEER ACCESS CONTROL ===== */
+    /* ===== v6.4 MASTER ENGINEER ACCESS CONTROL FIXED ===== */
     let MASTER_ENGINEERS = [];
 
-    function normName(x){
-      return String(x || "").trim().toLowerCase();
-    }
+    function normName(x){ return String(x || "").trim().toLowerCase(); }
 
     function getAdminConfigForAccess(){
       try { return JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}"); }
@@ -482,10 +480,6 @@
       return MASTER_ENGINEERS.some(e => e && e.active !== false && normName(e.name) === me);
     }
 
-    function getAccessModeText(){
-      return isCurrentEngineerAllowed() ? "EDIT ACCESS" : "VIEW ONLY";
-    }
-
     function updateAccessBadge(){
       const title = document.querySelector(".title");
       if(!title) return;
@@ -501,15 +495,14 @@
     }
 
     function showViewOnlyPanel(){
+      document.querySelectorAll(".access-view-panel").forEach(el=>el.remove());
       if(isCurrentEngineerAllowed()) return;
-      const panel = document.querySelector(".right-col") || document.querySelector(".action-panel") || document.body;
-      if(panel && !panel.querySelector(".access-view-panel")){
+      const panel = document.querySelector(".right-col") || document.querySelector(".action-panel");
+      if(panel){
         const warn = document.createElement("div");
         warn.className = "access-view-panel";
-        warn.textContent = "👁 View only: your name is not in Admin → Master Testing Engineer list.";
+        warn.textContent = "👁 View only: your name is not in Admin → Testing Engineers list.";
         panel.prepend(warn);
-      }
-      if(panel){
         panel.querySelectorAll("button,select,input").forEach(el=>{
           if(el.innerText && el.innerText.includes("Admin")) return;
           el.disabled = true;
@@ -519,10 +512,10 @@
 
     function requireMasterEngineerAccess(){
       if(isCurrentEngineerAllowed()) return true;
-      alert("View only access. Ask Admin to add your name in Master Testing Engineer list.");
+      alert("View only access. Ask Admin to add your name in Testing Engineers list.");
       return false;
     }
-    /* ===== END v6.4 MASTER ENGINEER ACCESS CONTROL ===== */
+    /* ===== END v6.4 MASTER ENGINEER ACCESS CONTROL FIXED ===== */
 
 
     /* ===== v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */
@@ -693,14 +686,12 @@
         const oldId = SELECTED_UPS_ID;
         if(oldId && oldId !== id) releaseSoftLock(oldId);
 
-        // Allow view always. Only authorized master engineers can take edit lock.
+        // Allow view always. If free or owned, lock it. If locked by other, open view-only.
         if(isCurrentEngineerAllowed() && !isSoftLockedByOther(id)) setSoftLock(id);
         oldSelectUPS(id);
         setTimeout(applySoftLockUI, 0);
-      setTimeout(updateAccessBadge, 0);
-      setTimeout(showViewOnlyPanel, 0);
-        setTimeout(showViewOnlyPanel, 0);
         setTimeout(updateAccessBadge, 0);
+        setTimeout(showViewOnlyPanel, 0);
       };
 
       const wrapNames = [
@@ -2078,10 +2069,10 @@ function renderBaySlots() {
     }
 
 initCloudDashboard();
-setTimeout(installSoftLockWrappers, 800);
-setInterval(applySoftLockUI, 1500);
 setTimeout(updateAccessBadge, 1000);
 setTimeout(showViewOnlyPanel, 1000);
+setTimeout(installSoftLockWrappers, 800);
+setInterval(applySoftLockUI, 1500);
 setInterval(updateAccessBadge, 2000);
 setInterval(showViewOnlyPanel, 2000);
 
