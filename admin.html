@@ -58,66 +58,7 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-/* ===== v6.4.5 ADMIN TESTING ENGINEERS DIRECT TAB ===== */
-function ensureMasterEngineers(){
-  if(typeof state === "undefined") return;
-  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [{name:"Vivek", active:true}];
-}
-function renderMasterEngineers(){
-  if(typeof state === "undefined") return;
-  ensureMasterEngineers();
-  const box = document.getElementById("engineerList");
-  if(!box) return;
-  box.innerHTML = state.masterEngineers.map((e,i)=>`
-    <div class="engineer-list-card">
-      <div class="engineer-pill">${e.name}</div>
-      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
-      <div>
-        <button onclick="editMasterEngineer(${i})">Edit</button>
-        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
-      </div>
-    </div>
-  `).join("") || `<p class="muted">No engineers added.</p>`;
-}
-function addMasterEngineer(){
-  ensureMasterEngineers();
-  const name = (document.getElementById("engName").value || "").trim();
-  const active = document.getElementById("engStatus").value === "active";
-  if(!name){ alert("Enter engineer name"); return; }
-  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
-  if(idx >= 0) state.masterEngineers[idx] = {name, active};
-  else state.masterEngineers.push({name, active});
-  save();
-  renderMasterEngineers();
-  clearEngineerForm();
-  alert("Testing engineer list updated");
-}
-function editMasterEngineer(i){
-  ensureMasterEngineers();
-  const e = state.masterEngineers[i];
-  if(!e) return;
-  document.getElementById("engName").value = e.name;
-  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
-}
-function deleteMasterEngineer(i){
-  ensureMasterEngineers();
-  if(!confirm("Delete this engineer?")) return;
-  state.masterEngineers.splice(i,1);
-  save();
-  renderMasterEngineers();
-}
-function clearEngineerForm(){
-  const n = document.getElementById("engName");
-  const s = document.getElementById("engStatus");
-  if(n) n.value = "";
-  if(s) s.value = "active";
-}
-const __oldAdminShowTab = showTab;
-showTab = function(id, btn){
-  __oldAdminShowTab(id, btn);
-  if(id === "engineers") renderMasterEngineers();
-};
-/* ===== END v6.4.5 ADMIN TESTING ENGINEERS DIRECT TAB ===== */
+
 
 </script>
 </head>
@@ -178,8 +119,8 @@ showTab = function(id, btn){
       </div>
     </div>
 
-    <button onclick="addMasterEngineer()" class="green">Add / Update Engineer</button>
-    <button onclick="clearEngineerForm()" class="orange">Clear</button>
+    <button onclick="window.addMasterEngineer()" class="green">Add / Update Engineer</button>
+    <button onclick="window.clearEngineerForm()" class="orange">Clear</button>
 
     <h3>Current Master List</h3>
     <div id="engineerList"></div>
@@ -1058,5 +999,116 @@ function drawChart(data){
 
 applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
+
+<script>
+/* ===== v6.4.6 FINAL GLOBAL ENGINEERS FIX ===== */
+(function(){
+  function ensureStateReady(){
+    if(typeof window.state === "undefined" && typeof state !== "undefined"){
+      window.state = state;
+    }
+    const s = (typeof state !== "undefined") ? state : window.state;
+    if(!s) return null;
+    s.masterEngineers = Array.isArray(s.masterEngineers) ? s.masterEngineers : [{name:"Vivek", active:true}];
+    return s;
+  }
+
+  window.renderMasterEngineers = function(){
+    const s = ensureStateReady();
+    const box = document.getElementById("engineerList");
+    if(!s || !box) return;
+
+    box.innerHTML = s.masterEngineers.map((e,i)=>`
+      <div class="engineer-list-card">
+        <div class="engineer-pill">${e.name}</div>
+        <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
+        <div>
+          <button type="button" onclick="window.editMasterEngineer(${i})">Edit</button>
+          <button type="button" onclick="window.deleteMasterEngineer(${i})" class="red">Delete</button>
+        </div>
+      </div>
+    `).join("") || `<p class="muted">No engineers added.</p>`;
+  };
+
+  window.addMasterEngineer = function(){
+    const s = ensureStateReady();
+    if(!s){ alert("Admin data not ready. Refresh page once."); return; }
+
+    const nameEl = document.getElementById("engName");
+    const statusEl = document.getElementById("engStatus");
+    const name = (nameEl && nameEl.value ? nameEl.value : "").trim();
+    const active = !statusEl || statusEl.value === "active";
+
+    if(!name){ alert("Enter engineer name"); return; }
+
+    const idx = s.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
+    if(idx >= 0) s.masterEngineers[idx] = {name, active};
+    else s.masterEngineers.push({name, active});
+
+    if(typeof save === "function") save();
+    window.renderMasterEngineers();
+    window.clearEngineerForm();
+    alert("Testing engineer list updated");
+  };
+
+  window.editMasterEngineer = function(i){
+    const s = ensureStateReady();
+    if(!s) return;
+    const e = s.masterEngineers[i];
+    if(!e) return;
+    const nameEl = document.getElementById("engName");
+    const statusEl = document.getElementById("engStatus");
+    if(nameEl) nameEl.value = e.name;
+    if(statusEl) statusEl.value = e.active!==false ? "active" : "inactive";
+  };
+
+  window.deleteMasterEngineer = function(i){
+    const s = ensureStateReady();
+    if(!s) return;
+    if(!confirm("Delete this engineer?")) return;
+    s.masterEngineers.splice(i,1);
+    if(typeof save === "function") save();
+    window.renderMasterEngineers();
+  };
+
+  window.clearEngineerForm = function(){
+    const n = document.getElementById("engName");
+    const st = document.getElementById("engStatus");
+    if(n) n.value = "";
+    if(st) st.value = "active";
+  };
+
+  // Hook original showTab safely
+  const oldShowTab = window.showTab || (typeof showTab === "function" ? showTab : null);
+  if(oldShowTab && !window.__finalEngineerTabHook){
+    window.__finalEngineerTabHook = true;
+    window.showTab = function(id, btn){
+      oldShowTab(id, btn);
+      if(id === "engineers") setTimeout(window.renderMasterEngineers, 0);
+    };
+    try { showTab = window.showTab; } catch(e) {}
+  }
+
+  // Make section visible when button was clicked even if old showTab fails.
+  document.addEventListener("click", function(e){
+    const t = e.target;
+    if(t && String(t.textContent || "").trim() === "Testing Engineers"){
+      setTimeout(function(){
+        const sec = document.getElementById("engineers");
+        if(sec){
+          sec.style.display = "block";
+          sec.classList.add("active");
+        }
+        window.renderMasterEngineers();
+      }, 50);
+    }
+  });
+
+  setTimeout(window.renderMasterEngineers, 500);
+  setInterval(window.renderMasterEngineers, 3000);
+})();
+/* ===== END v6.4.6 FINAL GLOBAL ENGINEERS FIX ===== */
+</script>
+
 </body>
 </html>
