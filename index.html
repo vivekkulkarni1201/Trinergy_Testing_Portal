@@ -325,8 +325,52 @@
       color:#ffd166;font-weight:900;
     }
 
+
+    .switch-engineer-btn{
+      display:inline-block;
+      margin-left:10px;
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,102,0,.6);
+      background:#ff6600;
+      color:#fff;
+      font-weight:900;
+      font-size:12px;
+      cursor:pointer;
+      box-shadow:0 4px 12px rgba(0,0,0,.24);
+    }
+    .switch-engineer-btn:hover{filter:brightness(1.08);}
+
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+    /* ===== v6.4.8 SWITCH ENGINEER BUTTON ===== */
+    function switchEngineer(){
+      try{
+        if(typeof releaseSoftLock === "function" && typeof SELECTED_UPS_ID !== "undefined"){
+          releaseSoftLock(SELECTED_UPS_ID);
+        }
+      }catch(e){}
+      localStorage.removeItem("trinergyEngineerName");
+      alert("Engineer cleared. Please enter new engineer name.");
+      location.reload();
+    }
+
+    function installSwitchEngineerButton(){
+      const title = document.querySelector(".title");
+      if(!title || document.getElementById("switchEngineerBtn")) return;
+      const btn = document.createElement("button");
+      btn.id = "switchEngineerBtn";
+      btn.className = "switch-engineer-btn";
+      btn.textContent = "Switch Engineer";
+      btn.onclick = switchEngineer;
+      title.appendChild(btn);
+    }
+
+    setTimeout(installSwitchEngineerButton, 800);
+    setInterval(installSwitchEngineerButton, 3000);
+    /* ===== END v6.4.8 SWITCH ENGINEER BUTTON ===== */
+
+</script>
 </head>
 <body>
   <!-- ADMIN CONNECTION ACTIVE: reads trinergyAdminV3 from localStorage for targets and timers -->
