@@ -266,10 +266,108 @@
     .ups-card.locked-by-other{opacity:.62;filter:saturate(.75);border-left-color:#ffd166 !important;cursor:not-allowed;}
     .lock-warning{background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.45);color:#ffd166;padding:10px 12px;border-radius:12px;margin:10px 0;font-weight:800;}
 
+
+    .login-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(5,10,20,.96);
+      z-index:9999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .login-card{
+      width:min(430px,92vw);
+      background:#15223b;
+      border:1px solid #334b75;
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 18px 60px rgba(0,0,0,.45);
+    }
+    .login-card h2{margin:0 0 8px}
+    .login-card p{color:#a8bad8;margin:0 0 14px;line-height:1.4}
+    .login-card input,.login-card select{
+      width:100%;
+      margin-top:8px;
+      padding:12px;
+      background:#0f1a2f;
+      color:#eef5ff;
+      border:1px solid #334b75;
+      border-radius:10px;
+      font-size:14px;
+    }
+    .login-card button{
+      margin-top:12px;
+      width:100%;
+      border:0;
+      border-radius:10px;
+      padding:12px;
+      font-weight:900;
+      color:white;
+      cursor:pointer;
+      background:#ff6600;
+    }
+    .login-error{
+      color:#ff9a9a;
+      font-weight:800;
+      margin-top:10px;
+      display:none;
+    }
+    .user-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      margin-left:10px;
+      padding:5px 10px;
+      border-radius:999px;
+      background:rgba(41,209,125,.14);
+      border:1px solid rgba(41,209,125,.5);
+      color:#29d17d;
+      font-weight:900;
+      font-size:12px;
+      letter-spacing:.04em;
+    }
+    .logout-btn{
+      background:#b73131!important;
+      color:white!important;
+      border:none!important;
+      padding:6px 10px!important;
+      border-radius:999px!important;
+      cursor:pointer!important;
+      font-size:11px!important;
+      font-weight:900!important;
+      margin-left:4px!important;
+      width:auto!important;
+    }
+    .viewer-warning{
+      background:rgba(255,193,7,.12);
+      border:1px solid rgba(255,193,7,.45);
+      color:#ffd166;
+      padding:10px 12px;
+      border-radius:12px;
+      margin:10px 0;
+      font-weight:800;
+    }
+
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h2>Trinergy Portal Login</h2>
+    <p>Engineer login required. Session will be remembered on this browser.</p>
+    <input id="loginUser" placeholder="Username" autocomplete="username" onkeydown="if(event.key==='Enter') doLogin()">
+    <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()">
+    <button onclick="doLogin()">Login</button>
+    <div class="login-error" id="loginError">Invalid username or password</div>
+    <p style="font-size:12px;margin-top:14px;">
+      Demo users: <b>engineer1/1234</b>, <b>engineer2/1234</b>, <b>viewer/view</b>, <b>admin/admin123</b>
+    </p>
+  </div>
+</div>
+
   <!-- ADMIN CONNECTION ACTIVE: reads trinergyAdminV3 from localStorage for targets and timers -->
   <header class="topbar">
     <div class="brand">
@@ -379,39 +477,112 @@
   <script>
     let UPS_LIST = [];
     let SELECTED_UPS_ID = null;
+    
+    /* ===== v6.4 LOGIN + ROLE SYSTEM ===== */
+    const TRINERGY_USERS = [
+      { username:"admin", password:"admin123", role:"admin", display:"Admin" },
+      { username:"vivek", password:"1234", role:"engineer", display:"Vivek" },
+      { username:"engineer1", password:"1234", role:"engineer", display:"Engineer 1" },
+      { username:"engineer2", password:"1234", role:"engineer", display:"Engineer 2" },
+      { username:"viewer", password:"view", role:"viewer", display:"Viewer" }
+    ];
+
+    let CURRENT_USER = null;
+
+    function normalizeUserName(x){ return String(x || "").trim().toLowerCase(); }
+
+    function getSavedSession(){
+      try { return JSON.parse(localStorage.getItem("trinergyLoginSession") || "null"); }
+      catch(e){ return null; }
+    }
+
+    function saveSession(user){
+      localStorage.setItem("trinergyLoginSession", JSON.stringify(user));
+    }
+
+    function clearSession(){
+      localStorage.removeItem("trinergyLoginSession");
+    }
+
+    function doLogin(){
+      const u = normalizeUserName(document.getElementById("loginUser").value);
+      const p = document.getElementById("loginPass").value;
+      const found = TRINERGY_USERS.find(x => normalizeUserName(x.username) === u && x.password === p);
+      if(!found){
+        document.getElementById("loginError").style.display = "block";
+        return;
+      }
+      CURRENT_USER = { username: found.username, role: found.role, display: found.display || found.username };
+      saveSession(CURRENT_USER);
+      applyLoginState();
+      render();
+    }
+
+    function logout(){
+      clearSession();
+      location.reload();
+    }
+
+    function applyLoginState(){
+      const session = getSavedSession();
+      if(session){
+        CURRENT_USER = session;
+        const overlay = document.getElementById("loginOverlay");
+        if(overlay) overlay.style.display = "none";
+      } else {
+        const overlay = document.getElementById("loginOverlay");
+        if(overlay) overlay.style.display = "flex";
+      }
+      updateUserBadge();
+    }
+
+    function isLoggedIn(){ return !!CURRENT_USER; }
+    function isViewer(){ return CURRENT_USER && CURRENT_USER.role === "viewer"; }
+    function canEdit(){ return CURRENT_USER && (CURRENT_USER.role === "engineer" || CURRENT_USER.role === "admin"); }
+
+    function updateUserBadge(){
+      const existing = document.getElementById("userBadge");
+      if(existing) existing.remove();
+      if(!CURRENT_USER) return;
+      const target = document.querySelector(".title") || document.querySelector(".brand") || document.body;
+      const badge = document.createElement("span");
+      badge.id = "userBadge";
+      badge.className = "user-badge";
+      badge.innerHTML = `👤 ${CURRENT_USER.display} (${CURRENT_USER.role}) <button class="logout-btn" onclick="logout()">Logout</button>`;
+      target.appendChild(badge);
+    }
+    /* ===== END v6.4 LOGIN + ROLE SYSTEM ===== */
+
     let isProcessing = false;
 
     /* ===== v6.2 UPS EDIT LOCK ===== */
     const LOCK_TIMEOUT_MS = 60000;
-    let CLIENT_ID = localStorage.getItem("trinergyClientId");
-    if (!CLIENT_ID) {
-      CLIENT_ID = "ENG-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-      localStorage.setItem("trinergyClientId", CLIENT_ID);
+    let CLIENT_ID = "guest";
+    let CLIENT_NAME = "Guest";
+    
+    function getLockIdentity(){
+      if(CURRENT_USER){
+        return {
+          id: normalizeUserName(CURRENT_USER.username),
+          name: CURRENT_USER.display || CURRENT_USER.username,
+          role: CURRENT_USER.role
+        };
+      }
+      return { id:"guest", name:"Guest", role:"viewer" };
     }
-    let CLIENT_NAME = localStorage.getItem("trinergyClientName");
-    if (!CLIENT_NAME) {
-      CLIENT_NAME = prompt("Engineer name for live edit lock:", CLIENT_ID) || CLIENT_ID;
-      localStorage.setItem("trinergyClientName", CLIENT_NAME);
-    }
+
     function nowMs(){ return Date.now(); }
     function isLockActive(u){ return !!(u && u.lockedBy && u.lockTime && (nowMs() - new Date(u.lockTime).getTime()) < LOCK_TIMEOUT_MS); }
-    function isLockedByOther(u){ return isLockActive(u) && u.lockedBy !== CLIENT_ID; }
-    function setLock(u){
-      if(!u) return false;
-      if(isLockedByOther(u)){
-        alert("This UPS is currently locked by " + (u.lockedByName || u.lockedBy) + ". Please wait or select another UPS.");
-        return false;
-      }
-      u.lockedBy = CLIENT_ID; u.lockedByName = CLIENT_NAME; u.lockTime = new Date().toISOString();
-      return true;
+    function isLockedByOther(u){
+      if(!isLockActive(u)) return false;
+      const ident = getLockIdentity();
+      return normalizeUserName(u.lockedBy) !== normalizeUserName(ident.id);
     }
-    function refreshLock(u){ if(u && u.lockedBy === CLIENT_ID) u.lockTime = new Date().toISOString(); }
-    function releaseLock(u){ if(u && u.lockedBy === CLIENT_ID){ delete u.lockedBy; delete u.lockedByName; delete u.lockTime; } }
-    function requireEditLock(){
-      const u = getSelectedUPS();
-      if(!u) return false;
-      if(isLockedByOther(u)){ alert("Cannot edit. Locked by " + (u.lockedByName || u.lockedBy)); return false; }
-      setLock(u); return true;
+    function refreshLock(u){
+      const ident = getLockIdentity();
+      if(u && normalizeUserName(u.lockedBy) === normalizeUserName(ident.id)){
+        u.lockTime = new Date().toISOString();
+      }
     }
     setInterval(() => {
       const u = (typeof getSelectedUPS === "function") ? getSelectedUPS() : null;
@@ -869,14 +1040,25 @@
 
     function getUPSById(id) { return UPS_LIST.find(u => u.id === id); }
     function selectUPS(id) {
-      const oldUps = getSelectedUPS();
+      const oldUps = getSelectedUPS ? getSelectedUPS() : null;
       if (oldUps && oldUps.id !== id) releaseLock(oldUps);
+
       const newUps = UPS_LIST.find(u => u.id === id);
       if (!newUps) return;
-      if (!setLock(newUps)) { render(); return; }
+
       SELECTED_UPS_ID = id;
+
+      if (canEdit()) {
+        if (!setLock(newUps)) {
+          render();
+          setTimeout(applyLockReadOnlyUI, 0);
+          return;
+        }
+      }
+
       render();
       setTimeout(finalSyncStageDropdownFromChecklist, 0);
+      setTimeout(applyLockReadOnlyUI, 0);
     }
 
     function updateMoveSlotOptions() {
@@ -1762,6 +1944,7 @@ function renderBaySlots() {
       render();
     }
 
+applyLoginState();
 initCloudDashboard();
   </script>
 </body>
