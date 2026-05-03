@@ -324,24 +324,12 @@
       background:rgba(168,186,216,.10);
       color:#a8bad8;
     }
-    .access-badge.edit{
-      background:rgba(41,209,125,.14);
-      border-color:rgba(41,209,125,.50);
-      color:#29d17d;
-    }
-    .access-badge.view{
-      background:rgba(255,193,7,.13);
-      border-color:rgba(255,193,7,.45);
-      color:#ffd166;
-    }
+    .access-badge.edit{background:rgba(41,209,125,.14);border-color:rgba(41,209,125,.50);color:#29d17d;}
+    .access-badge.view{background:rgba(255,193,7,.13);border-color:rgba(255,193,7,.45);color:#ffd166;}
     .access-view-panel{
-      margin:10px 0;
-      padding:10px 12px;
-      border-radius:12px;
-      background:rgba(255,193,7,.13);
-      border:1px solid rgba(255,193,7,.45);
-      color:#ffd166;
-      font-weight:900;
+      margin:10px 0;padding:10px 12px;border-radius:12px;
+      background:rgba(255,193,7,.13);border:1px solid rgba(255,193,7,.45);
+      color:#ffd166;font-weight:900;
     }
 
 </style>
@@ -459,7 +447,7 @@
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
 
-    /* ===== v6.4.2 MASTER ENGINEER ACCESS CONTROL ===== */
+    /* ===== v6.4.3 MASTER ENGINEER ACCESS CONTROL ===== */
     let MASTER_ENGINEERS = [];
 
     function normName(x){ return String(x || "").trim().toLowerCase(); }
@@ -515,7 +503,7 @@
       alert("View only access. Ask Admin to add your name in Testing Engineers list.");
       return false;
     }
-    /* ===== END v6.4.2 MASTER ENGINEER ACCESS CONTROL ===== */
+    /* ===== END v6.4.3 MASTER ENGINEER ACCESS CONTROL ===== */
 
 
     /* ===== v6.2 ACTIVITY BASED SOFT EDIT LOCK ===== */

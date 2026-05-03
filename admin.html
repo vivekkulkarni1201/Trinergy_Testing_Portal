@@ -48,6 +48,15 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
       letter-spacing:.04em;
     }
 \n
+    #engineersPanelGuaranteed{
+      margin:22px;
+      padding:18px;
+      border:1px solid #334b75;
+      border-radius:18px;
+      background:#15223b;
+      display:none;
+    }
+    #engineersPanelGuaranteed h2{margin-top:0}
     .engineer-list-card{
       display:grid;
       grid-template-columns: 1fr 120px 150px;
@@ -62,9 +71,142 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
     .engineer-pill{font-weight:900;color:#eef5ff}
     .status-active{color:#29d17d;font-weight:900}
     .status-inactive{color:#ffd166;font-weight:900}
+    .eng-float-btn{
+      background:#2563eb!important;
+      color:white!important;
+      border:none!important;
+      padding:12px 16px!important;
+      border-radius:14px!important;
+      cursor:pointer!important;
+      font-weight:900!important;
+      margin:10px 8px 10px 22px!important;
+      box-shadow:0 6px 16px rgba(0,0,0,.25)!important;
+    }
 
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+/* ===== v6.4.3 GUARANTEED ADMIN ENGINEERS PANEL ===== */
+function ensureMasterEngineers(){
+  if(typeof state === "undefined") return;
+  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [{name:"Vivek", active:true}];
+}
+
+function renderMasterEngineers(){
+  if(typeof state === "undefined") return;
+  ensureMasterEngineers();
+  const box = document.getElementById("engineerListGuaranteed");
+  if(!box) return;
+  box.innerHTML = state.masterEngineers.map((e,i)=>`
+    <div class="engineer-list-card">
+      <div class="engineer-pill">${e.name}</div>
+      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
+      <div>
+        <button onclick="editMasterEngineer(${i})">Edit</button>
+        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
+      </div>
+    </div>
+  `).join("") || `<p class="muted">No engineers added.</p>`;
+}
+
+function openEngineersPanel(){
+  const panel = document.getElementById("engineersPanelGuaranteed");
+  if(!panel) return;
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+  renderMasterEngineers();
+  setTimeout(()=>panel.scrollIntoView({behavior:"smooth",block:"start"}),100);
+}
+
+function addMasterEngineer(){
+  ensureMasterEngineers();
+  const nameEl = document.getElementById("engNameGuaranteed");
+  const statusEl = document.getElementById("engStatusGuaranteed");
+  const name = (nameEl.value || "").trim();
+  const active = statusEl.value === "active";
+  if(!name){ alert("Enter engineer name"); return; }
+
+  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
+  if(idx >= 0) state.masterEngineers[idx] = {name, active};
+  else state.masterEngineers.push({name, active});
+
+  save();
+  renderMasterEngineers();
+  clearEngineerForm();
+  alert("Testing engineer list updated");
+}
+
+function editMasterEngineer(i){
+  ensureMasterEngineers();
+  const e = state.masterEngineers[i];
+  if(!e) return;
+  document.getElementById("engNameGuaranteed").value = e.name;
+  document.getElementById("engStatusGuaranteed").value = e.active!==false ? "active" : "inactive";
+}
+
+function deleteMasterEngineer(i){
+  ensureMasterEngineers();
+  if(!confirm("Delete this engineer?")) return;
+  state.masterEngineers.splice(i,1);
+  save();
+  renderMasterEngineers();
+}
+
+function clearEngineerForm(){
+  const n = document.getElementById("engNameGuaranteed");
+  const s = document.getElementById("engStatusGuaranteed");
+  if(n) n.value = "";
+  if(s) s.value = "active";
+}
+
+function installGuaranteedEngineersPanel(){
+  if(document.getElementById("engineersPanelGuaranteed")) return;
+
+  const btn = document.createElement("button");
+  btn.className = "eng-float-btn";
+  btn.textContent = "Testing Engineers";
+  btn.onclick = openEngineersPanel;
+
+  const panel = document.createElement("section");
+  panel.id = "engineersPanelGuaranteed";
+  panel.innerHTML = `
+    <h2>Testing Engineers Master List</h2>
+    <p class="muted">Only Active names in this list can edit UPS movement, stage, timer and RTA. Other names will be view-only.</p>
+    <div class="grid two">
+      <div>
+        <label>Engineer Name</label>
+        <input id="engNameGuaranteed" placeholder="Example: Vivek">
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="engStatusGuaranteed">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <button onclick="addMasterEngineer()" class="green">Add / Update Engineer</button>
+    <button onclick="clearEngineerForm()" class="orange">Clear</button>
+    <h3>Current Master List</h3>
+    <div id="engineerListGuaranteed"></div>
+  `;
+
+  const header = document.querySelector("header") || document.body.firstElementChild;
+  if(header && header.parentNode){
+    header.parentNode.insertBefore(btn, header.nextSibling);
+    header.parentNode.insertBefore(panel, btn.nextSibling);
+  } else {
+    document.body.prepend(panel);
+    document.body.prepend(btn);
+  }
+
+  ensureMasterEngineers();
+  renderMasterEngineers();
+}
+
+document.addEventListener("DOMContentLoaded", () => setTimeout(installGuaranteedEngineersPanel, 300));
+setTimeout(installGuaranteedEngineersPanel, 1000);
+/* ===== END v6.4.3 GUARANTEED ADMIN ENGINEERS PANEL ===== */
+
+</script>
 </head>
 <body>
 <div class="login-overlay" id="loginOverlay">
@@ -235,118 +377,7 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 </main>
 <div class="toast" id="toast"></div>
 
-
-<section id="engineersPanel" class="card" style="display:none; margin:22px;">
-  <h2>Testing Engineers Master List</h2>
-  <p class="muted">Only Active names in this list can edit UPS movement, stage, timer and RTA. Other names will be view-only.</p>
-
-  <div class="grid two">
-    <div>
-      <label>Engineer Name</label>
-      <input id="engName" placeholder="Example: Vivek">
-    </div>
-    <div>
-      <label>Status</label>
-      <select id="engStatus">
-        <option value="active">Active</option>
-        <option value="inactive">Inactive</option>
-      </select>
-    </div>
-  </div>
-
-  <button onclick="addMasterEngineer()" class="green">Add / Update Engineer</button>
-  <button onclick="clearEngineerForm()" class="orange">Clear</button>
-
-  <h3>Current Master List</h3>
-  <div id="engineerList"></div>
-</section>
-
 <script>
-
-/* ===== v6.4.2 ADMIN TESTING ENGINEERS STABLE ===== */
-function ensureMasterEngineers(){
-  if(typeof state === "undefined") return;
-  state.masterEngineers = Array.isArray(state.masterEngineers) ? state.masterEngineers : [{name:"Vivek", active:true}];
-}
-
-function renderMasterEngineers(){
-  if(typeof state === "undefined") return;
-  ensureMasterEngineers();
-  const box = document.getElementById("engineerList");
-  if(!box) return;
-  box.innerHTML = state.masterEngineers.map((e,i)=>`
-    <div class="engineer-list-card">
-      <div class="engineer-pill">${e.name}</div>
-      <div class="${e.active!==false ? 'status-active':'status-inactive'}">${e.active!==false ? 'Active':'Inactive'}</div>
-      <div>
-        <button onclick="editMasterEngineer(${i})">Edit</button>
-        <button onclick="deleteMasterEngineer(${i})" class="red">Delete</button>
-      </div>
-    </div>
-  `).join("") || `<p class="muted">No engineers added.</p>`;
-}
-
-function hideAllAdminSectionsForEngineers(){
-  document.querySelectorAll(".tab-section").forEach(s => s.style.display = "none");
-  document.querySelectorAll("section.card").forEach(s => {
-    if(s.id !== "engineersPanel" && s.closest("body")) {
-      // leave top dashboard cards untouched, only hide large card sections if they have tab-like ids
-    }
-  });
-}
-
-function openEngineersPanel(){
-  try{
-    document.querySelectorAll(".tab-section").forEach(s => s.style.display = "none");
-    const p = document.getElementById("engineersPanel");
-    if(p) p.style.display = "block";
-    renderMasterEngineers();
-    window.scrollTo({top: document.body.scrollHeight, behavior:"smooth"});
-  }catch(e){
-    console.warn("Open Testing Engineers failed", e);
-  }
-}
-
-function addMasterEngineer(){
-  ensureMasterEngineers();
-  const name = (document.getElementById("engName").value || "").trim();
-  const active = document.getElementById("engStatus").value === "active";
-  if(!name){ alert("Enter engineer name"); return; }
-
-  const idx = state.masterEngineers.findIndex(e => String(e.name).trim().toLowerCase() === name.toLowerCase());
-  if(idx >= 0) state.masterEngineers[idx] = {name, active};
-  else state.masterEngineers.push({name, active});
-
-  save();
-  renderMasterEngineers();
-  clearEngineerForm();
-  alert("Testing engineer list updated");
-}
-
-function editMasterEngineer(i){
-  ensureMasterEngineers();
-  const e = state.masterEngineers[i];
-  if(!e) return;
-  document.getElementById("engName").value = e.name;
-  document.getElementById("engStatus").value = e.active!==false ? "active" : "inactive";
-}
-
-function deleteMasterEngineer(i){
-  ensureMasterEngineers();
-  if(!confirm("Delete this engineer?")) return;
-  state.masterEngineers.splice(i,1);
-  save();
-  renderMasterEngineers();
-}
-
-function clearEngineerForm(){
-  const n = document.getElementById("engName");
-  const s = document.getElementById("engStatus");
-  if(n) n.value = "";
-  if(s) s.value = "active";
-}
-/* ===== END v6.4.2 ADMIN TESTING ENGINEERS STABLE ===== */
-
 
 /* ===== v6 CLOUD SYNC - ADMIN ===== */
 const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
@@ -442,7 +473,7 @@ state.masterEngineers=Array.isArray(state.masterEngineers)?state.masterEngineers
 }
 /* ===== END v6 CLOUD SYNC - ADMIN ===== */
 
-const ADMIN_PASSWORD="admin123";
+const ADMIN_PASSWORD="Vivek@123";
 function checkAdminPassword(){const i=document.getElementById("adminPasswordInput"),e=document.getElementById("loginError");if(i.value===ADMIN_PASSWORD){sessionStorage.setItem("trinergyAdminUnlocked","yes");document.getElementById("loginOverlay").style.display="none"}else e.style.display="block"}
 function applyAdminLock(){if(sessionStorage.getItem("trinergyAdminUnlocked")==="yes")document.getElementById("loginOverlay").style.display="none"}
 
@@ -1083,7 +1114,7 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
 </body>
 </html>
