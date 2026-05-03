@@ -447,12 +447,15 @@
 
     function cleanExpiredLocks(){
       const t = lockNow();
+      let changed = false;
       Object.keys(SOFT_LOCKS || {}).forEach(id=>{
         const l = SOFT_LOCKS[id];
         if(!l || !l.time || (t - new Date(l.time).getTime()) > SOFT_LOCK_TIMEOUT_MS){
           delete SOFT_LOCKS[id];
+          changed = true;
         }
       });
+      return changed;
     }
 
     function getSoftLock(id){
@@ -526,6 +529,14 @@
     }
 
     function applySoftLockUI(){
+      // Always clean stale UI first
+      document.querySelectorAll(".soft-lock-panel").forEach(el => el.remove());
+      document.querySelectorAll(".soft-lock-badge").forEach(el => el.remove());
+      document.querySelectorAll(".soft-locked-other").forEach(el => el.classList.remove("soft-locked-other"));
+
+      const expired = cleanExpiredLocks();
+      if(expired) scheduleSoftLockCloudSave();
+
       const title = document.querySelector(".title");
       if(title && !document.getElementById("softLockUser")){
         const span = document.createElement("span");
@@ -539,34 +550,37 @@
         const txt = card.innerText || "";
         const ups = UPS_LIST.find(u => txt.includes(u.serial));
         if(!ups) return;
+
         const l = getSoftLock(ups.id);
         if(l){
-          if(String(l.by || "").toLowerCase() !== String(CURRENT_ENGINEER_NAME || "").toLowerCase()){
-            card.classList.add("soft-locked-other");
-          }
+          const lockedByOther = String(l.by || "").toLowerCase() !== String(CURRENT_ENGINEER_NAME || "").toLowerCase();
+          if(lockedByOther) card.classList.add("soft-locked-other");
+
           const serialDiv = card.querySelector(".serial");
-          if(serialDiv && !serialDiv.querySelector(".soft-lock-badge")){
+          if(serialDiv){
             const b = document.createElement("span");
             b.className = "soft-lock-badge";
-            b.textContent = "🔒 " + (String(l.by || "").toLowerCase() === String(CURRENT_ENGINEER_NAME || "").toLowerCase() ? "You" : l.by);
+            b.textContent = "🔒 " + (lockedByOther ? l.by : "You");
             serialDiv.appendChild(b);
           }
         }
       });
 
+      // If selected UPS lock has expired, do not show view-only message
       if(SELECTED_UPS_ID && isSoftLockedByOther(SELECTED_UPS_ID)){
         const panel = document.querySelector(".right-col") || document.querySelector(".action-panel") || document.body;
-        if(panel && !panel.querySelector(".soft-lock-panel")){
+        if(panel){
           const l = getSoftLock(SELECTED_UPS_ID);
           const warn = document.createElement("div");
           warn.className = "soft-lock-panel";
-          warn.textContent = "🔒 View only: locked by " + (l.by || "another engineer");
+          warn.textContent = "🔒 View only: locked by " + (l && l.by ? l.by : "another engineer");
           panel.prepend(warn);
+
+          panel.querySelectorAll("button,select,input").forEach(el=>{
+            if(el.innerText && el.innerText.includes("Admin")) return;
+            el.disabled = true;
+          });
         }
-        panel.querySelectorAll("button,select,input").forEach(el=>{
-          if(el.innerText && el.innerText.includes("Admin")) return;
-          el.disabled = true;
-        });
       }
     }
 
@@ -1960,6 +1974,18 @@ function renderBaySlots() {
 initCloudDashboard();
 setTimeout(installSoftLockWrappers, 800);
 setInterval(applySoftLockUI, 1500);
+
+    /* v6.3_AUTO_LOCK_CLEANUP: auto remove expired lock UI without user click */
+    setInterval(() => {
+      const changed = cleanExpiredLocks();
+      if(changed){
+        scheduleSoftLockCloudSave();
+        render();
+      } else {
+        applySoftLockUI();
+      }
+    }, 5000);
+
   </script>
 </body>
 </html>
