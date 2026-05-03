@@ -261,6 +261,7 @@
     }
 
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- ADMIN CONNECTION ACTIVE: reads trinergyAdminV3 from localStorage for targets and timers -->
@@ -370,6 +371,125 @@
     let UPS_LIST = [];
     let SELECTED_UPS_ID = null;
     let isProcessing = false;
+
+    /* ===== v6 CLOUD SYNC - DASHBOARD ===== */
+    const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5cmNib2tteGFidGRuZnRwZmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDU0OTksImV4cCI6MjA5MzMyMTQ5OX0.ZlqqAWCHo9s2Rmh92DpEUEtbQqwcJQRl0kexuzqHHEA";
+    const CLOUD_ENABLED = !!(window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY);
+    const cloudClient = CLOUD_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    let CLOUD_READY = false;
+    let CLOUD_APPLYING = false;
+    let CLOUD_SAVE_TIMER = null;
+    let CLOUD_LAST_SAVE_TS = 0;
+
+    async function cloudLoadRow(rowId) {
+      if (!cloudClient) return null;
+      try {
+        const { data, error } = await cloudClient.from("ups_data").select("*").eq("id", rowId).maybeSingle();
+        if (error) {
+          console.warn("Cloud load error", rowId, error.message);
+          return null;
+        }
+        return data ? data.data : null;
+      } catch(e) {
+        console.warn("Cloud load exception", rowId, e);
+        return null;
+      }
+    }
+
+    async function cloudSaveRow(rowId, payload) {
+      if (!cloudClient || !CLOUD_READY || CLOUD_APPLYING) return;
+      try {
+        CLOUD_LAST_SAVE_TS = Date.now();
+        const { error } = await cloudClient.from("ups_data").upsert({
+          id: rowId,
+          data: payload
+        });
+        if (error) console.warn("Cloud save error", rowId, error.message);
+      } catch(e) {
+        console.warn("Cloud save exception", rowId, e);
+      }
+    }
+
+    function getDashboardCloudPayload() {
+      return {
+        UPS_LIST: UPS_LIST,
+        SELECTED_UPS_ID: SELECTED_UPS_ID,
+        liveLog: getLiveLog(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    function applyDashboardCloudPayload(payload) {
+      if (!payload) return;
+      CLOUD_APPLYING = true;
+      UPS_LIST = Array.isArray(payload.UPS_LIST) ? payload.UPS_LIST : [];
+      if (payload.liveLog) {
+        try { localStorage.setItem("trinergyLiveLogV1", JSON.stringify(payload.liveLog)); } catch(e) {}
+      }
+      if (payload.SELECTED_UPS_ID && UPS_LIST.some(u => u.id === payload.SELECTED_UPS_ID)) {
+        SELECTED_UPS_ID = payload.SELECTED_UPS_ID;
+      } else {
+        SELECTED_UPS_ID = null;
+      }
+      render();
+      CLOUD_APPLYING = false;
+    }
+
+    function scheduleCloudDashboardSave() {
+      if (!CLOUD_READY || CLOUD_APPLYING) return;
+      clearTimeout(CLOUD_SAVE_TIMER);
+      CLOUD_SAVE_TIMER = setTimeout(() => cloudSaveRow("main", getDashboardCloudPayload()), 350);
+    }
+
+    async function loadAdminConfigFromCloudForDashboard() {
+      const adminPayload = await cloudLoadRow("admin");
+      if (adminPayload) {
+        try {
+          localStorage.setItem("trinergyAdminV3", JSON.stringify(adminPayload));
+        } catch(e) {}
+      }
+    }
+
+    async function initCloudDashboard() {
+      if (!cloudClient) {
+        CLOUD_READY = true;
+        render();
+        return;
+      }
+
+      await loadAdminConfigFromCloudForDashboard();
+      const payload = await cloudLoadRow("main");
+      if (payload) {
+        applyDashboardCloudPayload(payload);
+      } else {
+        CLOUD_READY = true;
+        render();
+        await cloudSaveRow("main", getDashboardCloudPayload());
+      }
+
+      CLOUD_READY = true;
+
+      cloudClient
+        .channel("trinergy-live-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "ups_data" }, async (payload) => {
+          if (Date.now() - CLOUD_LAST_SAVE_TS < 800) return;
+
+          const rowId = payload.new && payload.new.id;
+          if (rowId === "main") {
+            applyDashboardCloudPayload(payload.new.data);
+          }
+          if (rowId === "admin") {
+            try {
+              localStorage.setItem("trinergyAdminV3", JSON.stringify(payload.new.data));
+              render();
+            } catch(e) {}
+          }
+        })
+        .subscribe();
+    }
+    /* ===== END v6 CLOUD SYNC - DASHBOARD ===== */
+
 
     const MONTHLY_TARGETS = { T3X: 20, T2X: 15, TST: 10 };
     const WEEKLY_TARGETS = { T3X: 5, T2X: 4, TST: 3 };
@@ -1566,6 +1686,7 @@ function renderBaySlots() {
     function render() {
       renderKPIs(); renderStatusBoxes(); renderWaitingArea(); renderReworkArea(); renderTempHoldArea(); renderBaySlots();
       refreshAssignBayDropdownFromAdmin(); renderActionPanel();
+      scheduleCloudDashboardSave();
     }
 
     
@@ -1581,7 +1702,7 @@ function renderBaySlots() {
       render();
     }
 
-render();
+initCloudDashboard();
   </script>
 </body>
 </html>

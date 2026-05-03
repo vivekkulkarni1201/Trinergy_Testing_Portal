@@ -35,6 +35,7 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 .login-error{color:#ff9a9a;font-weight:800;margin-top:10px;display:none}
 @media(max-width:1000px){.form-grid,.mini-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.form-grid,.mini-grid{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start;gap:12px}}
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="login-overlay" id="loginOverlay">
@@ -206,6 +207,100 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
 <div class="toast" id="toast"></div>
 
 <script>
+
+/* ===== v6 CLOUD SYNC - ADMIN ===== */
+const SUPABASE_URL = "https://ayrcbokmxabtdnftpfkm.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5cmNib2tteGFidGRuZnRwZmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDU0OTksImV4cCI6MjA5MzMyMTQ5OX0.ZlqqAWCHo9s2Rmh92DpEUEtbQqwcJQRl0kexuzqHHEA";
+const CLOUD_ENABLED = !!(window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY);
+const adminCloudClient = CLOUD_ENABLED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let ADMIN_CLOUD_READY = false;
+let ADMIN_CLOUD_APPLYING = false;
+let ADMIN_CLOUD_SAVE_TIMER = null;
+let ADMIN_CLOUD_LAST_SAVE_TS = 0;
+
+async function adminCloudLoadRow(rowId){
+  if(!adminCloudClient) return null;
+  try {
+    const {data,error} = await adminCloudClient.from("ups_data").select("*").eq("id", rowId).maybeSingle();
+    if(error){ console.warn("Admin cloud load error", error.message); return null; }
+    return data ? data.data : null;
+  } catch(e) {
+    console.warn("Admin cloud load exception", e);
+    return null;
+  }
+}
+
+async function adminCloudSaveRow(rowId, payload){
+  if(!adminCloudClient || !ADMIN_CLOUD_READY || ADMIN_CLOUD_APPLYING) return;
+  try {
+    ADMIN_CLOUD_LAST_SAVE_TS = Date.now();
+    const {error} = await adminCloudClient.from("ups_data").upsert({ id: rowId, data: payload });
+    if(error) console.warn("Admin cloud save error", error.message);
+  } catch(e) {
+    console.warn("Admin cloud save exception", e);
+  }
+}
+
+function scheduleAdminCloudSave(){
+  if(!ADMIN_CLOUD_READY || ADMIN_CLOUD_APPLYING) return;
+  clearTimeout(ADMIN_CLOUD_SAVE_TIMER);
+  ADMIN_CLOUD_SAVE_TIMER = setTimeout(() => adminCloudSaveRow("admin", state), 350);
+}
+
+function rerenderAdminAfterCloud(){
+  renderTargets();
+  setHistCategory(state.histCategory || "Target");
+  loadTimers();
+  renderBays();
+  renderStages();
+  renderSerials();
+  renderOld();
+  if(typeof initReportSelectors === "function") initReportSelectors();
+  if(typeof renderReport === "function") renderReport();
+}
+
+async function initAdminCloudSync(){
+  if(!adminCloudClient){
+    ADMIN_CLOUD_READY = true;
+    return;
+  }
+  const payload = await adminCloudLoadRow("admin");
+  if(payload){
+    ADMIN_CLOUD_APPLYING = true;
+    state = payload;
+    state.targets=state.targets||[];
+    state.monthlyTargets=state.monthlyTargets||[];
+    state.weeklyTargets=state.weeklyTargets||[];
+    state.hist=state.hist||{};
+    state.histCategory=state.histCategory||"Target";
+    state.bays=state.bays||[];
+    state.stages=state.stages||[];
+    state.serials=state.serials||{T3X:42,T2X:18,TST:9};
+    state.oldSerials=state.oldSerials||[];
+    state.timers=state.timers||{mode:"TEST MODE",coreTest:1,tstTest:1,boostTest:1,coreReal:240,tstReal:60,boostReal:30};
+    localStorage.setItem("trinergyAdminV3", JSON.stringify(state));
+    rerenderAdminAfterCloud();
+    ADMIN_CLOUD_APPLYING = false;
+  }
+  ADMIN_CLOUD_READY = true;
+  await adminCloudSaveRow("admin", state);
+
+  adminCloudClient
+    .channel("trinergy-admin-sync")
+    .on("postgres_changes", { event: "*", schema: "public", table: "ups_data" }, (payload) => {
+      if(Date.now() - ADMIN_CLOUD_LAST_SAVE_TS < 800) return;
+      if(payload.new && payload.new.id === "admin"){
+        ADMIN_CLOUD_APPLYING = true;
+        state = payload.new.data || state;
+        localStorage.setItem("trinergyAdminV3", JSON.stringify(state));
+        rerenderAdminAfterCloud();
+        ADMIN_CLOUD_APPLYING = false;
+      }
+    })
+    .subscribe();
+}
+/* ===== END v6 CLOUD SYNC - ADMIN ===== */
+
 const ADMIN_PASSWORD="admin123";
 function checkAdminPassword(){const i=document.getElementById("adminPasswordInput"),e=document.getElementById("loginError");if(i.value===ADMIN_PASSWORD){sessionStorage.setItem("trinergyAdminUnlocked","yes");document.getElementById("loginOverlay").style.display="none"}else e.style.display="block"}
 function applyAdminLock(){if(sessionStorage.getItem("trinergyAdminUnlocked")==="yes")document.getElementById("loginOverlay").style.display="none"}
@@ -259,7 +354,7 @@ if(state.targets.length && !state.monthlyTargets.length && !state.weeklyTargets.
   });
 }
 
-function save(){localStorage.setItem("trinergyAdminV3",JSON.stringify(state))}
+function save(){localStorage.setItem("trinergyAdminV3",JSON.stringify(state)); scheduleAdminCloudSave();}
 function toast(msg){const t=document.getElementById("toast");t.innerText=msg;t.style.display="block";setTimeout(()=>t.style.display="none",1800)}
 function isoWeekNumber(date){const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));const dayNum=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-dayNum);const yStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil((((d-yStart)/86400000)+1)/7)}
 function tickClock(){const n=new Date();dateText.innerText=n.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});timeText.innerText=n.toLocaleTimeString("en-GB");weekText.innerText="W"+String(isoWeekNumber(n)).padStart(2,"0")}
@@ -846,7 +941,7 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
 </body>
 </html>
