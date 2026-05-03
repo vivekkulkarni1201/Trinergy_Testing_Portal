@@ -119,8 +119,8 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
       </div>
     </div>
 
-    <button onclick="window.addMasterEngineer()" class="green">Add / Update Engineer</button>
-    <button onclick="window.clearEngineerForm()" class="orange">Clear</button>
+    <button onclick="window.window.window.window.addMasterEngineer()" class="green">Add / Update Engineer</button>
+    <button onclick="window.window.clearEngineerForm()" class="orange">Clear</button>
 
     <h3>Current Master List</h3>
     <div id="engineerList"></div>
@@ -997,7 +997,7 @@ function drawChart(data){
 }
 /* ===== END v5.5 DUAL AXIS CHART FIX ===== */
 
-applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
+applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCategory);loadTimers();renderBays();renderStages();renderSerials();renderOld();window.renderMasterEngineers();initReportSelectors();renderReport();save();initAdminCloudSync();
 </script>
 
 <script>
@@ -1046,8 +1046,8 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
     else s.masterEngineers.push({name, active});
 
     if(typeof save === "function") save();
-    window.renderMasterEngineers();
-    window.clearEngineerForm();
+    window.window.renderMasterEngineers();
+    window.window.clearEngineerForm();
     alert("Testing engineer list updated");
   };
 
@@ -1068,7 +1068,7 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
     if(!confirm("Delete this engineer?")) return;
     s.masterEngineers.splice(i,1);
     if(typeof save === "function") save();
-    window.renderMasterEngineers();
+    window.window.renderMasterEngineers();
   };
 
   window.clearEngineerForm = function(){
@@ -1099,7 +1099,7 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
           sec.style.display = "block";
           sec.classList.add("active");
         }
-        window.renderMasterEngineers();
+        window.window.renderMasterEngineers();
       }, 50);
     }
   });
