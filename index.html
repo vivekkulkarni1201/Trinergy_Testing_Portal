@@ -1157,8 +1157,32 @@
     function generateSerial(type) {
       const now = new Date();
       const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const existingTypeCount = UPS_LIST.filter(u => u.type === type).map(u => Number((u.serial || "").slice(-4))).filter(n => !Number.isNaN(n));
-      const nextMain = (existingTypeCount.length ? Math.max(...existingTypeCount) : 0) + 1;
+
+      // v6.5.1: Serial number now follows Admin → Serials counter.
+      // Current Counter = last used serial number. Next generated serial = counter + 1.
+      let adminCfg = {};
+      try { adminCfg = JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}"); } catch(e) { adminCfg = {}; }
+      adminCfg.serials = adminCfg.serials || {};
+
+      const adminCounter = Number(adminCfg.serials[type]) || 0;
+      const existingMax = Math.max(0, ...UPS_LIST
+        .filter(u => u.type === type)
+        .map(u => Number((u.serial || "").slice(-4)))
+        .filter(n => !Number.isNaN(n)));
+
+      const nextMain = Math.max(adminCounter, existingMax) + 1;
+
+      // Immediately advance counter locally + cloud so next engineer/browser gets next serial.
+      adminCfg.serials[type] = nextMain;
+      try {
+        localStorage.setItem("trinergyAdminV3", JSON.stringify(adminCfg));
+        if (typeof cloudSaveRow === "function") {
+          cloudSaveRow("admin", adminCfg);
+        }
+      } catch(e) {
+        console.warn("Serial counter sync failed", e);
+      }
+
       const mainPart = `${yyyymm}${type}${String(nextMain).padStart(4, "0")}`;
       const week = isoWeekNumber(now);
       const weeklyCount = UPS_LIST.filter(u => u.type === type && u.weekNo === week).length + 1;

@@ -224,7 +224,7 @@ window.clearEngineerForm = window.clearEngineerForm || function(){};
 </div></section>
 
 <section id="serials" class="tab-content"><div class="panel">
-  <h2>Serial Settings</h2><div class="hint">Counter save works locally.</div>
+  <h2>Serial Settings</h2><div class="hint">Counter syncs to cloud. Current Counter = last used serial. Next UPS will be counter + 1.</div>
   <div class="form-grid"><div><label>Type</label><select id="serialType"><option>T3X</option><option>T2X</option><option>TST</option></select></div><div><label>Current Counter</label><input id="serialCounter" type="number" value="42"></div><div><label>Admin Password</label><input type="password"></div></div>
   <div class="button-row"><button class="success" onclick="saveSerial()">Save Counter</button></div>
   <div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Type</th><th>Current Counter</th><th>Next Serial</th></tr></thead><tbody id="serialBody"></tbody></table></div>
