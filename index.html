@@ -802,10 +802,102 @@
       };
     }
 
+    
+    /* ===== v6.5.2 MULTI ENGINEER DATA INTEGRITY HELPERS ===== */
+    function normalizeUPSForIntegrity(u) {
+      if (!u) return u;
+      if (!u.id) u.id = `${u.type || "UPS"}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+      if (!u._updatedAt) u._updatedAt = u.updatedAt || u.createdAt || new Date().toISOString();
+      return u;
+    }
+
+    function chooseUPSRecord(localU, remoteU, preferLocal) {
+      if (!localU) return normalizeUPSForIntegrity(remoteU);
+      if (!remoteU) return normalizeUPSForIntegrity(localU);
+
+      // Protect against blank/partial records overwriting good records
+      const localHasSerial = !!localU.serial;
+      const remoteHasSerial = !!remoteU.serial;
+      if (localHasSerial && !remoteHasSerial) return normalizeUPSForIntegrity(localU);
+      if (remoteHasSerial && !localHasSerial) return normalizeUPSForIntegrity(remoteU);
+
+      // If both exist, caller decides. Save path prefers local, realtime path prefers remote.
+      return normalizeUPSForIntegrity(preferLocal ? localU : remoteU);
+    }
+
+    function mergeUPSListsSafe(localList, remoteList, preferLocal = true) {
+      const map = new Map();
+
+      (remoteList || []).forEach(u => {
+        if (!u) return;
+        normalizeUPSForIntegrity(u);
+        map.set(u.id, u);
+      });
+
+      (localList || []).forEach(u => {
+        if (!u) return;
+        normalizeUPSForIntegrity(u);
+        const old = map.get(u.id);
+        map.set(u.id, chooseUPSRecord(u, old, preferLocal));
+      });
+
+      // Remove exact duplicate serials by keeping the most complete/latest-looking record.
+      const bySerial = new Map();
+      Array.from(map.values()).forEach(u => {
+        if (!u || !u.serial) return;
+        const old = bySerial.get(u.serial);
+        if (!old) bySerial.set(u.serial, u);
+        else {
+          const oldScore = Object.keys(old).length + (old.checklist ? old.checklist.length : 0);
+          const newScore = Object.keys(u).length + (u.checklist ? u.checklist.length : 0);
+          bySerial.set(u.serial, newScore >= oldScore ? u : old);
+        }
+      });
+
+      const deduped = [];
+      const seenSerial = new Set();
+      Array.from(map.values()).forEach(u => {
+        if (!u) return;
+        if (u.serial) {
+          const keep = bySerial.get(u.serial);
+          if (keep && keep.id !== u.id) return;
+          if (seenSerial.has(u.serial)) return;
+          seenSerial.add(u.serial);
+        }
+        deduped.push(u);
+      });
+
+      return deduped;
+    }
+
+    async function mergeLatestCloudIntoLocal(preferLocal = true) {
+      if (!cloudClient) return;
+      try {
+        const latest = await cloudLoadRow("main");
+        if (latest && Array.isArray(latest.UPS_LIST)) {
+          UPS_LIST = mergeUPSListsSafe(UPS_LIST, latest.UPS_LIST, preferLocal);
+          if (!SELECTED_UPS_ID && latest.SELECTED_UPS_ID && UPS_LIST.some(u => u.id === latest.SELECTED_UPS_ID)) {
+            SELECTED_UPS_ID = latest.SELECTED_UPS_ID;
+          }
+        }
+      } catch(e) {
+        console.warn("Merge latest cloud failed", e);
+      }
+    }
+
+    async function safeCloudSaveDashboard() {
+      if (!CLOUD_READY || CLOUD_APPLYING) return;
+      UPS_LIST.forEach(u => { if(u && !u._updatedAt) u._updatedAt = u.updatedAt || u.createdAt || new Date().toISOString(); });
+      await mergeLatestCloudIntoLocal(true);
+      await cloudSaveRow("main", getDashboardCloudPayload());
+    }
+    /* ===== END v6.5.2 MULTI ENGINEER DATA INTEGRITY HELPERS ===== */
+
+
     function applyDashboardCloudPayload(payload) {
       if (!payload) return;
       CLOUD_APPLYING = true;
-      UPS_LIST = Array.isArray(payload.UPS_LIST) ? payload.UPS_LIST : [];
+      UPS_LIST = mergeUPSListsSafe(UPS_LIST, Array.isArray(payload.UPS_LIST) ? payload.UPS_LIST : [], false);
       if (payload.liveLog) {
         try { localStorage.setItem("trinergyLiveLogV1", JSON.stringify(payload.liveLog)); } catch(e) {}
       }
@@ -821,7 +913,7 @@
     function scheduleCloudDashboardSave() {
       if (!CLOUD_READY || CLOUD_APPLYING) return;
       clearTimeout(CLOUD_SAVE_TIMER);
-      CLOUD_SAVE_TIMER = setTimeout(() => cloudSaveRow("main", getDashboardCloudPayload()), 350);
+      CLOUD_SAVE_TIMER = setTimeout(() => safeCloudSaveDashboard(), 450);
     }
 
     async function loadAdminConfigFromCloudForDashboard() {
@@ -1224,11 +1316,51 @@
       };
     }
 
-    function addUPS() {
+    async function addUPS() {
       const type = document.getElementById("upsType").value;
       if (!type) return alert("Select UPS type");
+
+      // v6.5.2: first merge latest cloud so serial generation sees other engineers' newly added UPS.
+      await mergeLatestCloudIntoLocal(true);
+
       const s = generateSerial(type);
-      UPS_LIST.push({ id: `${type}-${Date.now()}`, type, serial: s.serial, weekTag: s.weekTag, weekNo: s.weekNo, monthKey: s.serial.slice(0, 6), locationType: "WAITING", bay: null, slot: null, stage: null, timer: null, checklist: buildChecklist(type), toFinishing: false, rework: false, tempHold: false, completedDate: null, createdAt: new Date().toISOString(), returnedAt: null, everReturned: false });
+
+      // Duplicate guard: if generated serial already exists after merge, bump from live max.
+      let finalSerial = s.serial;
+      if (UPS_LIST.some(u => u.serial === finalSerial)) {
+        const now = new Date();
+        const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const maxLive = Math.max(0, ...UPS_LIST
+          .filter(u => u.type === type)
+          .map(u => Number((u.serial || "").slice(-4)))
+          .filter(n => !Number.isNaN(n)));
+        const next = maxLive + 1;
+        finalSerial = `${yyyymm}${type}${String(next).padStart(4, "0")}`;
+      }
+
+      UPS_LIST.push({
+        id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+        type,
+        serial: finalSerial,
+        weekTag: s.weekTag,
+        weekNo: s.weekNo,
+        monthKey: finalSerial.slice(0, 6),
+        locationType: "WAITING",
+        bay: null,
+        slot: null,
+        stage: null,
+        timer: null,
+        checklist: buildChecklist(type),
+        toFinishing: false,
+        rework: false,
+        tempHold: false,
+        completedDate: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        _updatedAt: new Date().toISOString(),
+        returnedAt: null,
+        everReturned: false
+      });
       render();
     }
 
