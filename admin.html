@@ -60,7 +60,212 @@ button.category.active{background:#c62828;border:1px solid #ff6b6b}
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 
 
+
+/* ===== v6.5.3 MONTHLY EXCEL REPORT EXPORT ===== */
+function excelMonthIndex(m){ return months.indexOf(m); }
+function safeNum(x){ return Number(x)||0; }
+function fpyPercent(completed, rta){
+  completed = safeNum(completed); rta = safeNum(rta);
+  if(!completed) return "";
+  return Math.max(0, Math.round(((completed-rta)/completed)*100));
+}
+function monthNameFromDate(d){
+  if(!d) return "";
+  const dt = new Date(d);
+  if(Number.isNaN(dt.getTime())) return "";
+  return months[dt.getMonth()];
+}
+function yearFromDate(d){
+  if(!d) return "";
+  const dt = new Date(d);
+  if(Number.isNaN(dt.getTime())) return "";
+  return String(dt.getFullYear());
+}
+function isCompletedUPS(u){
+  const st = String(u.status || u.stage || "").toLowerCase();
+  return !!(u.completedDate || u.toFinishing || st.includes("finishing") || st.includes("completed"));
+}
+function completedMonthForUPS(u){
+  if(u.completedDate) return monthNameFromDate(u.completedDate);
+  if(u.updatedAt && isCompletedUPS(u)) return monthNameFromDate(u.updatedAt);
+  if(u.createdAt && isCompletedUPS(u)) return monthNameFromDate(u.createdAt);
+  if(u.monthKey && String(u.monthKey).length >= 6){
+    const mm = Number(String(u.monthKey).slice(4,6));
+    return months[mm-1] || "";
+  }
+  if(u.serial && String(u.serial).length >= 6){
+    const match = String(u.serial).match(/^(\d{4})(\d{2})/);
+    if(match){
+      const mm = Number(match[2]);
+      return months[mm-1] || "";
+    }
+  }
+  return "";
+}
+function completedYearForUPS(u){
+  if(u.completedDate) return yearFromDate(u.completedDate);
+  if(u.updatedAt && isCompletedUPS(u)) return yearFromDate(u.updatedAt);
+  if(u.createdAt && isCompletedUPS(u)) return yearFromDate(u.createdAt);
+  if(u.monthKey && String(u.monthKey).length >= 6) return String(u.monthKey).slice(0,4);
+  if(u.serial){
+    const match = String(u.serial).match(/^(\d{4})(\d{2})/);
+    if(match) return match[1];
+  }
+  return "";
+}
+function worksheetFromAOA(rows){
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const widths = [];
+  rows.forEach(r => (r||[]).forEach((v,i)=>{
+    const len = String(v==null?"":v).length;
+    widths[i] = Math.min(Math.max(widths[i]||10, len+2), 38);
+  }));
+  ws["!cols"] = widths.map(w => ({wch:w}));
+  return ws;
+}
+function addSheet(wb, name, rows){
+  XLSX.utils.book_append_sheet(wb, worksheetFromAOA(rows), name.substring(0,31));
+}
+async function downloadMonthlyExcelReport(){
+  if(typeof XLSX === "undefined"){
+    alert("Excel export library not loaded. Check internet/CDN access and refresh once.");
+    return;
+  }
+
+  const selectedYear = reportYear ? reportYear.value : String(new Date().getFullYear());
+  const generatedAt = new Date();
+  const typeList = ["T3X","T2X","TST"];
+
+  let mainPayload = null;
+  try { mainPayload = await adminCloudLoadRow("main"); } catch(e) { console.warn("main payload load failed", e); }
+  const upsList = mainPayload && Array.isArray(mainPayload.UPS_LIST) ? mainPayload.UPS_LIST : [];
+
+  const liveCompletedSerialRows = [];
+  const liveMonthly = {};
+  months.forEach(m => liveMonthly[m] = {T3X:0,T2X:0,TST:0,rta:0});
+
+  upsList.forEach(u => {
+    if(!u || !u.type) return;
+    const t = u.type;
+    const m = completedMonthForUPS(u);
+    const y = completedYearForUPS(u);
+    if(String(y) !== String(selectedYear)) return;
+
+    if(isCompletedUPS(u) && liveMonthly[m] && liveMonthly[m][t] !== undefined){
+      liveMonthly[m][t] += 1;
+      liveCompletedSerialRows.push([
+        u.serial || "",
+        t,
+        m,
+        y,
+        u.weekTag || "",
+        u.bay || "",
+        u.slot || "",
+        u.stage || "",
+        u.completedDate || "",
+        u.toFinishing ? "YES" : "",
+        u.everReturned ? "YES" : "",
+        u.rework ? "YES" : ""
+      ]);
+    }
+
+    if((u.everReturned || u.rework) && liveMonthly[m]){
+      liveMonthly[m].rta += 1;
+    }
+  });
+
+  const data = {};
+  months.forEach(m=>{
+    data[m] = {T3X:0,T2X:0,TST:0,rta:0};
+    typeList.forEach(t=>{
+      data[m][t] = getHistoricalNumber("Completed", selectedYear, m, t) + safeNum(liveMonthly[m][t]);
+      data[m].rta += getHistoricalNumber("RTA", selectedYear, m, t);
+    });
+    data[m].rta += safeNum(liveMonthly[m].rta);
+  });
+
+  // Dashboard Summary: this month + cumulative till-date
+  const summaryRows = [
+    ["TRINERGY MONTHLY PROGRESS REPORT"],
+    ["Generated At", generatedAt.toLocaleString()],
+    ["Year", selectedYear],
+    [],
+    ["Month", "T3X Monthly", "T2X Monthly", "TST Monthly", "Total Monthly", "RTA/Fault Monthly", "FPY % Monthly", "T3X Cumulative", "T2X Cumulative", "TST Cumulative", "Total Cumulative", "RTA/Fault Cumulative", "FPY % Cumulative"]
+  ];
+
+  const cum = {T3X:0,T2X:0,TST:0,rta:0};
+  months.forEach(m=>{
+    const row = data[m];
+    const total = row.T3X + row.T2X + row.TST;
+    cum.T3X += row.T3X; cum.T2X += row.T2X; cum.TST += row.TST; cum.rta += row.rta;
+    const cumTotal = cum.T3X + cum.T2X + cum.TST;
+    summaryRows.push([
+      m,
+      row.T3X, row.T2X, row.TST, total, row.rta, fpyPercent(total,row.rta),
+      cum.T3X, cum.T2X, cum.TST, cumTotal, cum.rta, fpyPercent(cumTotal,cum.rta)
+    ]);
+  });
+
+  const typeWiseRows = [
+    ["Month", "Type", "Monthly Completed", "Cumulative Completed"],
+  ];
+  typeList.forEach(t=>{
+    let running = 0;
+    months.forEach(m=>{
+      running += data[m][t] || 0;
+      typeWiseRows.push([m, t, data[m][t] || 0, running]);
+    });
+    typeWiseRows.push([]);
+  });
+
+  const kpiRows = [
+    ["Month","Completed","RTA/Fault","FPY %","Cumulative Completed","Cumulative RTA/Fault","Cumulative FPY %"]
+  ];
+  let cDone = 0, cRta = 0;
+  months.forEach(m=>{
+    const total = data[m].T3X + data[m].T2X + data[m].TST;
+    cDone += total;
+    cRta += data[m].rta || 0;
+    kpiRows.push([m,total,data[m].rta || 0,fpyPercent(total,data[m].rta),cDone,cRta,fpyPercent(cDone,cRta)]);
+  });
+
+  const serialRows = [
+    ["Serial","Type","Completed Month","Year","Week Tag","Bay","Slot","Stage","Completed Date","To Finishing","Ever RTA","Currently RTA/Rework"]
+  ];
+  liveCompletedSerialRows.sort((a,b)=>String(a[0]).localeCompare(String(b[0]))).forEach(r => serialRows.push(r));
+  if(liveCompletedSerialRows.length === 0){
+    serialRows.push(["No live completed serial-wise records found for selected year","","","","","","","","","","",""]);
+  }
+
+  const histRows = [
+    ["Year","Month","Type","Historical Completed","Historical RTA/Fault"]
+  ];
+  months.forEach(m=>typeList.forEach(t=>{
+    histRows.push([selectedYear,m,t,getHistoricalNumber("Completed", selectedYear, m, t),getHistoricalNumber("RTA", selectedYear, m, t)]);
+  }));
+
+  const oldRows = [
+    ["Serial","Type","Reason","Location/Status"]
+  ];
+  (state.oldSerials || []).forEach(x => oldRows.push([x.serial || "", x.type || "", x.reason || "", x.location || ""]));
+  if(!(state.oldSerials || []).length) oldRows.push(["No old serial re-entry records","","",""]);
+
+  const wb = XLSX.utils.book_new();
+  addSheet(wb, "Dashboard Summary", summaryRows);
+  addSheet(wb, "Type Wise Monthly", typeWiseRows);
+  addSheet(wb, "Serial Wise Completed", serialRows);
+  addSheet(wb, "KPI Trend", kpiRows);
+  addSheet(wb, "Historical Counts", histRows);
+  addSheet(wb, "Old Serial ReEntry", oldRows);
+
+  const stamp = `${selectedYear}_${String(generatedAt.getMonth()+1).padStart(2,"0")}${String(generatedAt.getDate()).padStart(2,"0")}_${String(generatedAt.getHours()).padStart(2,"0")}${String(generatedAt.getMinutes()).padStart(2,"0")}`;
+  XLSX.writeFile(wb, `TRINERGY_MONTHLY_PROGRESS_REPORT_${stamp}.xlsx`);
+  toast("Monthly Excel report downloaded");
+}
+/* ===== END v6.5.3 MONTHLY EXCEL REPORT EXPORT ===== */
+
 </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -249,6 +454,7 @@ window.clearEngineerForm = window.clearEngineerForm || function(){};
   </div>
   <div class="button-row">
     <button class="success" onclick="renderReport()">Generate Report</button>
+    <button class="success" onclick="downloadMonthlyExcelReport()">Download Monthly Excel Report</button>
     <button class="secondary" onclick="clearLiveLog()">Clear Live Log</button>
   </div>
   <section class="mini-grid" style="margin-top:16px">

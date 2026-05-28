@@ -377,6 +377,94 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
     
 
+
+    /* ===== v6.5.4 LOCK OWNER ENABLE FIX ===== */
+    function normalizeLockName(x){
+      return String(x || "").trim().toLowerCase();
+    }
+
+    function currentEngineerLockName(){
+      try { return normalizeLockName(CURRENT_ENGINEER_NAME); }
+      catch(e){ return ""; }
+    }
+
+    function selectedSoftLockOwnerName(){
+      try{
+        if(!SELECTED_UPS_ID || typeof getSoftLock !== "function") return "";
+        const l = getSoftLock(SELECTED_UPS_ID);
+        return l ? normalizeLockName(l.by) : "";
+      }catch(e){ return ""; }
+    }
+
+    function isSelectedLockedByAnotherEngineer(){
+      const owner = selectedSoftLockOwnerName();
+      const me = currentEngineerLockName();
+      return !!(owner && me && owner !== me);
+    }
+
+    function unlockActionControlsForOwner(){
+      const panel = document.querySelector(".right-col") || document.querySelector(".action-panel");
+      if(!panel) return;
+      panel.querySelectorAll("button,select,input").forEach(el=>{
+        if(el.id === "switchEngineerBtn" || el.id === "switchEngineerFloat") return;
+        el.disabled = false;
+      });
+    }
+
+    function enforceCorrectEditState(){
+      unlockActionControlsForOwner();
+
+      const panel = document.querySelector(".right-col") || document.querySelector(".action-panel");
+      if(!panel) return;
+
+      panel.querySelectorAll(".soft-lock-panel,.access-view-panel").forEach(el=>el.remove());
+
+      const viewOnly = (typeof isCurrentEngineerAllowed === "function") ? !isCurrentEngineerAllowed() : false;
+      const lockedByOther = isSelectedLockedByAnotherEngineer();
+
+      if(viewOnly || lockedByOther){
+        const warn = document.createElement("div");
+        warn.className = lockedByOther ? "soft-lock-panel" : "access-view-panel";
+
+        if(lockedByOther){
+          const owner = selectedSoftLockOwnerName();
+          warn.textContent = "🔒 View only: locked by " + owner;
+        } else {
+          warn.textContent = "👁 View only: your name is not in Admin → Testing Engineers list.";
+        }
+
+        panel.prepend(warn);
+
+        panel.querySelectorAll("button,select,input").forEach(el=>{
+          if(el.id === "switchEngineerBtn" || el.id === "switchEngineerFloat") return;
+          if(el.innerText && el.innerText.includes("Admin")) return;
+          el.disabled = true;
+        });
+      }
+    }
+
+    const __oldApplySoftLockUI_v654 = typeof applySoftLockUI === "function" ? applySoftLockUI : null;
+    if(__oldApplySoftLockUI_v654){
+      applySoftLockUI = function(){
+        unlockActionControlsForOwner();
+        __oldApplySoftLockUI_v654();
+        setTimeout(enforceCorrectEditState, 0);
+      };
+    }
+
+    const __oldShowViewOnlyPanel_v654 = typeof showViewOnlyPanel === "function" ? showViewOnlyPanel : null;
+    if(__oldShowViewOnlyPanel_v654){
+      showViewOnlyPanel = function(){
+        unlockActionControlsForOwner();
+        __oldShowViewOnlyPanel_v654();
+        setTimeout(enforceCorrectEditState, 0);
+      };
+    }
+
+    setInterval(enforceCorrectEditState, 1200);
+    setTimeout(enforceCorrectEditState, 800);
+    /* ===== END v6.5.4 LOCK OWNER ENABLE FIX ===== */
+
 </script>
 </head>
 <body>
@@ -521,6 +609,7 @@
       badge.textContent = allowed ? "✅ MASTER ENGINEER" : "👁 VIEW ONLY";
     }
     function showViewOnlyPanel(){
+      if(typeof unlockActionControlsForOwner === 'function') unlockActionControlsForOwner();
       document.querySelectorAll(".access-view-panel").forEach(el=>el.remove());
       if(isCurrentEngineerAllowed()) return;
       const panel = document.querySelector(".right-col") || document.querySelector(".action-panel");
@@ -647,6 +736,7 @@
     }
 
     function applySoftLockUI(){
+      if(typeof unlockActionControlsForOwner === 'function') unlockActionControlsForOwner();
       // Always clean stale UI first
       document.querySelectorAll(".soft-lock-panel").forEach(el => el.remove());
       document.querySelectorAll(".soft-lock-badge").forEach(el => el.remove());
