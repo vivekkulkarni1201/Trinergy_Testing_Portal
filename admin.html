@@ -1412,5 +1412,211 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
 /* ===== END v6.4.7 FINAL ENGINEER MASTER OVERRIDE ===== */
 </script>
 
+
+<script>
+/* ===== v6.5.5 ADMIN TAB STABILITY FIX ===== */
+(function(){
+  function showOnlyTab(tabId, btn){
+    try{
+      document.querySelectorAll(".tab-content").forEach(sec => {
+        sec.classList.remove("active");
+        sec.style.display = "none";
+      });
+      document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+
+      const sec = document.getElementById(tabId);
+      if(sec){
+        sec.classList.add("active");
+        sec.style.display = "block";
+      }
+      if(btn) btn.classList.add("active");
+
+      if(tabId === "reports" && typeof renderReport === "function") setTimeout(renderReport, 0);
+      if(tabId === "engineers" && typeof window.renderMasterEngineers === "function") setTimeout(window.renderMasterEngineers, 0);
+      if(tabId === "historical" && typeof renderHistorical === "function") setTimeout(renderHistorical, 0);
+      if(tabId === "serials" && typeof renderSerials === "function") setTimeout(renderSerials, 0);
+      if(tabId === "old" && typeof renderOld === "function") setTimeout(renderOld, 0);
+    }catch(e){
+      console.warn("showTab stable override failed", e);
+    }
+  }
+
+  window.showTab = showOnlyTab;
+  try { showTab = showOnlyTab; } catch(e) {}
+
+  document.addEventListener("click", function(e){
+    const btn = e.target.closest && e.target.closest(".tab");
+    if(!btn) return;
+    const txt = (btn.textContent || "").trim().toLowerCase();
+    const onclick = String(btn.getAttribute("onclick") || "");
+    let id = "";
+    const m = onclick.match(/showTab\('([^']+)'/);
+    if(m) id = m[1];
+    else if(txt.includes("target")) id = "targets";
+    else if(txt.includes("historical")) id = "historical";
+    else if(txt.includes("timer")) id = "timers";
+    else if(txt.includes("test bay")) id = "bays";
+    else if(txt.includes("stage")) id = "stages";
+    else if(txt.includes("serial") && !txt.includes("old")) id = "serials";
+    else if(txt.includes("old serial")) id = "old";
+    else if(txt.includes("report")) id = "reports";
+    else if(txt.includes("testing engineer")) id = "engineers";
+
+    if(id){
+      e.preventDefault();
+      e.stopPropagation();
+      showOnlyTab(id, btn);
+    }
+  }, true);
+})();
+/* ===== END v6.5.5 ADMIN TAB STABILITY FIX ===== */
+</script>
+
+
+<script>
+/* ===== v6.5.5 REPORT KPI ALIGNMENT FIX ===== */
+(function(){
+  const TYPES_V655 = ["T3X","T2X","TST"];
+  const MONTHS_V655 = (typeof months !== "undefined" && Array.isArray(months)) ? months : ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function n(x){ return Number(x)||0; }
+
+  async function getMainUPSList(){
+    try{
+      if(typeof adminCloudLoadRow === "function"){
+        const p = await adminCloudLoadRow("main");
+        if(p && Array.isArray(p.UPS_LIST)) return p.UPS_LIST;
+      }
+    }catch(e){}
+    try{
+      const raw = localStorage.getItem("trinergyDashboardV3") || localStorage.getItem("trinergy_state") || "{}";
+      const p = JSON.parse(raw);
+      if(Array.isArray(p.UPS_LIST)) return p.UPS_LIST;
+      if(Array.isArray(p.ups)) return p.ups;
+    }catch(e){}
+    return [];
+  }
+
+  function yearMonthFromUPS(u){
+    let d = u.completedDate || u.updatedAt || u.createdAt || "";
+    if(d){
+      const dt = new Date(d);
+      if(!Number.isNaN(dt.getTime())) return {year:String(dt.getFullYear()), month:MONTHS_V655[dt.getMonth()]};
+    }
+    const src = String(u.monthKey || u.serial || "");
+    const m = src.match(/^(\d{4})(\d{2})/);
+    if(m) return {year:m[1], month:MONTHS_V655[Number(m[2])-1] || ""};
+    return {year:"", month:""};
+  }
+
+  function isCompleted(u){
+    const st = String(u.status || u.stage || "").toLowerCase();
+    return !!(u.completedDate || u.toFinishing || st.includes("complete") || st.includes("finishing"));
+  }
+
+  function histCompleted(year, month, type){
+    try{ if(typeof getHistoricalNumber === "function") return n(getHistoricalNumber("Completed", year, month, type)); }catch(e){}
+    return 0;
+  }
+  function histRta(year, month, type){
+    try{ if(typeof getHistoricalNumber === "function") return n(getHistoricalNumber("RTA", year, month, type)); }catch(e){}
+    return 0;
+  }
+  function fpy(done,rta){
+    done=n(done); rta=n(rta);
+    if(!done) return "-";
+    return Math.max(0, Math.round(((done-rta)/done)*100)) + "%";
+  }
+
+  window.__buildAlignedMonthlyRows = async function(year){
+    const ups = await getMainUPSList();
+    const out = {};
+    MONTHS_V655.forEach(m => out[m] = {T3X:0,T2X:0,TST:0,RTA:0});
+
+    MONTHS_V655.forEach(m=>{
+      TYPES_V655.forEach(t=>{
+        out[m][t] += histCompleted(year,m,t);
+        out[m].RTA += histRta(year,m,t);
+      });
+    });
+
+    ups.forEach(u=>{
+      if(!u || !u.type || !TYPES_V655.includes(u.type)) return;
+      const ym = yearMonthFromUPS(u);
+      if(String(ym.year)!==String(year) || !out[ym.month]) return;
+      if(isCompleted(u)) out[ym.month][u.type] += 1;
+      if(u.everReturned || u.rework) out[ym.month].RTA += 1;
+    });
+
+    return out;
+  };
+
+  window.renderReportAligned = async function(){
+    const y = (document.getElementById("reportYear") || window.reportYear || {}).value || String(new Date().getFullYear());
+    const data = await window.__buildAlignedMonthlyRows(y);
+
+    const rows = MONTHS_V655.map(m=>{
+      const total = data[m].T3X + data[m].T2X + data[m].TST;
+      return `<tr>
+        <td>${m}</td><td>${data[m].T3X}</td><td>${data[m].T2X}</td><td>${data[m].TST}</td>
+        <td>${total}</td><td>${data[m].RTA}</td><td>${fpy(total,data[m].RTA)}</td>
+      </tr>`;
+    }).join("");
+
+    const tables = Array.from(document.querySelectorAll("table"));
+    const reportTable = tables.find(t => {
+      const txt = (t.textContent||"").toLowerCase();
+      return txt.includes("t3x completed") && txt.includes("total completed") && txt.includes("fpy");
+    });
+
+    if(reportTable){
+      let tbody = reportTable.querySelector("tbody");
+      if(!tbody){ tbody = document.createElement("tbody"); reportTable.appendChild(tbody); }
+      tbody.innerHTML = rows;
+    }
+  };
+
+  const oldRenderReport = typeof renderReport === "function" ? renderReport : null;
+  window.renderReport = async function(){
+    if(oldRenderReport) oldRenderReport();
+    setTimeout(()=>window.renderReportAligned(), 150);
+  };
+  try { renderReport = window.renderReport; } catch(e) {}
+})();
+/* ===== END v6.5.5 REPORT KPI ALIGNMENT FIX ===== */
+</script>
+
+
+<script>
+/* ===== v6.5.5 HISTORICAL REFRESH SAFEGUARD ===== */
+(function(){
+  function refreshHistoricalIfVisible(){
+    try{
+      const sec = document.getElementById("historical");
+      if(sec && (sec.style.display !== "none") && typeof renderHistorical === "function") renderHistorical();
+    }catch(e){}
+  }
+  setInterval(refreshHistoricalIfVisible, 2500);
+})();
+/* ===== END v6.5.5 HISTORICAL REFRESH SAFEGUARD ===== */
+</script>
+
+
+<script>
+/* ===== v6.5.5 EXCEL ALIGNMENT HOOK ===== */
+(function(){
+  const oldDownload = window.downloadMonthlyExcelReport || (typeof downloadMonthlyExcelReport === "function" ? downloadMonthlyExcelReport : null);
+  if(oldDownload && !window.__excelAlignHookV655){
+    window.__excelAlignHookV655 = true;
+    window.downloadMonthlyExcelReport = async function(){
+      try{ if(window.renderReportAligned) await window.renderReportAligned(); }catch(e){}
+      return oldDownload();
+    };
+    try { downloadMonthlyExcelReport = window.downloadMonthlyExcelReport; } catch(e){}
+  }
+})();
+/* ===== END v6.5.5 EXCEL ALIGNMENT HOOK ===== */
+</script>
+
 </body>
 </html>
