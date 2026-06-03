@@ -304,15 +304,15 @@ window.clearEngineerForm = window.clearEngineerForm || function(){};
 </section>
 
 <nav class="nav">
-  <button class="tab active" onclick="showTab('targets', this)">Targets</button>
-  <button class="tab" onclick="showTab('historical', this)">Historical Data</button>
-  <button class="tab" onclick="showTab('timers', this)">Timers</button>
-  <button class="tab" onclick="showTab('bays', this)">Test Bays</button>
-  <button class="tab" onclick="showTab('stages', this)">Stages</button>
-  <button class="tab" onclick="showTab('serials', this)">Serials</button>
+  <button class="tab active" data-tab="targets" onclick="showTab('targets', this)">Targets</button>
+  <button class="tab" data-tab="historical" onclick="showTab('historical', this)">Historical Data</button>
+  <button class="tab" data-tab="timers" onclick="showTab('timers', this)">Timers</button>
+  <button class="tab" data-tab="bays" onclick="showTab('bays', this)">Test Bays</button>
+  <button class="tab" data-tab="stages" onclick="showTab('stages', this)">Stages</button>
+  <button class="tab" data-tab="serials" onclick="showTab('serials', this)">Serials</button>
   <button class="tab" onclick="showTab('oldserial', this)">Old Serial Re-entry</button>
-  <button class="tab" onclick="showTab('reports', this)">Reports</button>
-  <button class="tab" onclick="showTab('engineers', this)">Testing Engineers</button>
+  <button class="tab" data-tab="reports" onclick="showTab('reports', this)">Reports</button>
+  <button class="tab" data-tab="engineers" onclick="showTab('engineers', this)">Testing Engineers</button>
 </nav>
 
 
@@ -1413,64 +1413,7 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
 </script>
 
 
-<script>
-/* ===== v6.5.5 ADMIN TAB STABILITY FIX ===== */
-(function(){
-  function showOnlyTab(tabId, btn){
-    try{
-      document.querySelectorAll(".tab-content").forEach(sec => {
-        sec.classList.remove("active");
-        sec.style.display = "none";
-      });
-      document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
 
-      const sec = document.getElementById(tabId);
-      if(sec){
-        sec.classList.add("active");
-        sec.style.display = "block";
-      }
-      if(btn) btn.classList.add("active");
-
-      if(tabId === "reports" && typeof renderReport === "function") setTimeout(renderReport, 0);
-      if(tabId === "engineers" && typeof window.renderMasterEngineers === "function") setTimeout(window.renderMasterEngineers, 0);
-      if(tabId === "historical" && typeof renderHistorical === "function") setTimeout(renderHistorical, 0);
-      if(tabId === "serials" && typeof renderSerials === "function") setTimeout(renderSerials, 0);
-      if(tabId === "old" && typeof renderOld === "function") setTimeout(renderOld, 0);
-    }catch(e){
-      console.warn("showTab stable override failed", e);
-    }
-  }
-
-  window.showTab = showOnlyTab;
-  try { showTab = showOnlyTab; } catch(e) {}
-
-  document.addEventListener("click", function(e){
-    const btn = e.target.closest && e.target.closest(".tab");
-    if(!btn) return;
-    const txt = (btn.textContent || "").trim().toLowerCase();
-    const onclick = String(btn.getAttribute("onclick") || "");
-    let id = "";
-    const m = onclick.match(/showTab\('([^']+)'/);
-    if(m) id = m[1];
-    else if(txt.includes("target")) id = "targets";
-    else if(txt.includes("historical")) id = "historical";
-    else if(txt.includes("timer")) id = "timers";
-    else if(txt.includes("test bay")) id = "bays";
-    else if(txt.includes("stage")) id = "stages";
-    else if(txt.includes("serial") && !txt.includes("old")) id = "serials";
-    else if(txt.includes("old serial")) id = "old";
-    else if(txt.includes("report")) id = "reports";
-    else if(txt.includes("testing engineer")) id = "engineers";
-
-    if(id){
-      e.preventDefault();
-      e.stopPropagation();
-      showOnlyTab(id, btn);
-    }
-  }, true);
-})();
-/* ===== END v6.5.5 ADMIN TAB STABILITY FIX ===== */
-</script>
 
 
 <script>
@@ -1616,6 +1559,88 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
   }
 })();
 /* ===== END v6.5.5 EXCEL ALIGNMENT HOOK ===== */
+</script>
+
+
+<script>
+/* ===== v6.5.6 HARD ADMIN TAB CONTROLLER FIX ===== */
+(function(){
+  const VALID = new Set(["targets","historical","timers","bays","stages","serials","old","reports","engineers"]);
+
+  function getTabIdFromButton(btn){
+    if(!btn) return "";
+    if(btn.dataset && btn.dataset.tab) return btn.dataset.tab;
+
+    const onclick = String(btn.getAttribute("onclick") || "");
+    const m = onclick.match(/showTab\(['"]([^'"]+)['"]/);
+    if(m) return m[1];
+
+    const txt = String(btn.textContent || "").trim().toLowerCase();
+    if(txt === "targets") return "targets";
+    if(txt.includes("historical")) return "historical";
+    if(txt.includes("timer")) return "timers";
+    if(txt.includes("test bay")) return "bays";
+    if(txt === "stages" || txt.includes("stage")) return "stages";
+    if(txt === "serials") return "serials";
+    if(txt.includes("old serial")) return "old";
+    if(txt.includes("report")) return "reports";
+    if(txt.includes("testing engineer")) return "engineers";
+    return "";
+  }
+
+  function forceShowTab(tabId, btn){
+    if(!VALID.has(tabId)) return;
+
+    document.querySelectorAll(".tab-content").forEach(sec => {
+      sec.classList.remove("active");
+      sec.style.display = "none";
+      sec.hidden = true;
+    });
+
+    const sec = document.getElementById(tabId);
+    if(sec){
+      sec.hidden = false;
+      sec.style.display = "block";
+      sec.classList.add("active");
+    }
+
+    document.querySelectorAll("button.tab, .tab").forEach(b => b.classList.remove("active"));
+    if(btn) btn.classList.add("active");
+
+    setTimeout(() => {
+      try{ if(tabId === "reports" && typeof renderReport === "function") renderReport(); }catch(e){}
+      try{ if(tabId === "historical" && typeof renderHistorical === "function") renderHistorical(); }catch(e){}
+      try{ if(tabId === "serials" && typeof renderSerials === "function") renderSerials(); }catch(e){}
+      try{ if(tabId === "old" && typeof renderOld === "function") renderOld(); }catch(e){}
+      try{ if(tabId === "engineers" && typeof window.renderMasterEngineers === "function") window.renderMasterEngineers(); }catch(e){}
+    }, 50);
+  }
+
+  window.showTab = function(tabId, btn){
+    forceShowTab(tabId, btn || document.querySelector(`[data-tab="${tabId}"]`));
+  };
+  try { showTab = window.showTab; } catch(e){}
+
+  document.addEventListener("click", function(e){
+    const btn = e.target.closest && e.target.closest("button");
+    const tabId = getTabIdFromButton(btn);
+    if(!tabId) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    forceShowTab(tabId, btn);
+    return false;
+  }, true);
+
+  setTimeout(() => {
+    const anyVisible = Array.from(document.querySelectorAll(".tab-content")).some(sec => {
+      return sec.style.display !== "none" && !sec.hidden;
+    });
+    if(!anyVisible) forceShowTab("targets", document.querySelector('[data-tab="targets"]'));
+  }, 500);
+})();
+/* ===== END v6.5.6 HARD ADMIN TAB CONTROLLER FIX ===== */
 </script>
 
 </body>
