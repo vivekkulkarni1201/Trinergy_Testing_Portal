@@ -984,6 +984,161 @@
     /* ===== END v6.5.2 MULTI ENGINEER DATA INTEGRITY HELPERS ===== */
 
 
+    
+    /* ===== v6.5.7 HIGH LOAD LOCATION PROTECTION ===== */
+    function locationRankV657(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      if(lt === "BAY") return 3;
+      if(lt === "TEMP") return 2;
+      if(lt === "RTA") return 2;
+      if(lt === "WAITING") return 1;
+      return 0;
+    }
+
+    function hasRealBayLocationV657(u){
+      return !!(u && String(u.locationType || "").toUpperCase() === "BAY" && u.bay && u.slot);
+    }
+
+    function isWeakLocationV657(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      return (!u || !lt || lt === "WAITING" || (!u.bay && !u.slot));
+    }
+
+    function preserveBestLocationV657(localU, remoteU, mergedU){
+      if(!localU && !remoteU) return mergedU;
+      if(!localU) return mergedU || remoteU;
+      if(!remoteU) return mergedU || localU;
+
+      const localRank = locationRankV657(localU);
+      const remoteRank = locationRankV657(remoteU);
+
+      // Never allow stale WAITING/blank location to overwrite real bay location.
+      if(hasRealBayLocationV657(remoteU) && isWeakLocationV657(localU)){
+        mergedU.locationType = remoteU.locationType;
+        mergedU.bay = remoteU.bay;
+        mergedU.slot = remoteU.slot;
+        mergedU.tempHold = remoteU.tempHold;
+        mergedU.rework = remoteU.rework;
+        return mergedU;
+      }
+
+      if(hasRealBayLocationV657(localU) && isWeakLocationV657(remoteU)){
+        mergedU.locationType = localU.locationType;
+        mergedU.bay = localU.bay;
+        mergedU.slot = localU.slot;
+        mergedU.tempHold = localU.tempHold;
+        mergedU.rework = localU.rework;
+        return mergedU;
+      }
+
+      // Stronger location wins.
+      if(remoteRank > localRank){
+        mergedU.locationType = remoteU.locationType;
+        mergedU.bay = remoteU.bay;
+        mergedU.slot = remoteU.slot;
+        mergedU.tempHold = remoteU.tempHold;
+        mergedU.rework = remoteU.rework;
+      } else if(localRank > remoteRank){
+        mergedU.locationType = localU.locationType;
+        mergedU.bay = localU.bay;
+        mergedU.slot = localU.slot;
+        mergedU.tempHold = localU.tempHold;
+        mergedU.rework = localU.rework;
+      }
+
+      return mergedU;
+    }
+
+    function mergeUPSRecordV657(localU, remoteU, preferLocal){
+      if(!localU) return (typeof normalizeUPSForIntegrity === "function") ? normalizeUPSForIntegrity(remoteU) : remoteU;
+      if(!remoteU) return (typeof normalizeUPSForIntegrity === "function") ? normalizeUPSForIntegrity(localU) : localU;
+
+      const merged = Object.assign({}, remoteU, localU);
+
+      if(remoteU.serial && !localU.serial) merged.serial = remoteU.serial;
+      if(localU.serial && !remoteU.serial) merged.serial = localU.serial;
+
+      preserveBestLocationV657(localU, remoteU, merged);
+
+      // Realtime path should keep remote stage/timer/checklist, save path prefers local.
+      if(!preferLocal){
+        merged.stage = remoteU.stage;
+        merged.checklist = remoteU.checklist;
+        merged.timer = remoteU.timer;
+        merged.completedDate = remoteU.completedDate;
+        merged.toFinishing = remoteU.toFinishing;
+      }
+
+      if(typeof normalizeUPSForIntegrity === "function") normalizeUPSForIntegrity(merged);
+      merged._lastMergeAt = new Date().toISOString();
+      return merged;
+    }
+
+    function mergeUPSListsHighLoadSafeV657(localList, remoteList, preferLocal = true) {
+      const remoteMap = new Map();
+
+      (remoteList || []).forEach(u => {
+        if(!u) return;
+        if(typeof normalizeUPSForIntegrity === "function") normalizeUPSForIntegrity(u);
+        remoteMap.set(u.id, u);
+      });
+
+      const out = new Map(remoteMap);
+
+      (localList || []).forEach(localU => {
+        if(!localU) return;
+        if(typeof normalizeUPSForIntegrity === "function") normalizeUPSForIntegrity(localU);
+        const remoteU = out.get(localU.id);
+        out.set(localU.id, mergeUPSRecordV657(localU, remoteU, preferLocal));
+      });
+
+      const bySerial = new Map();
+      Array.from(out.values()).forEach(u => {
+        if(!u || !u.serial) return;
+        const old = bySerial.get(u.serial);
+        if(!old){
+          bySerial.set(u.serial, u);
+          return;
+        }
+        const oldScore = locationRankV657(old)*100 + Object.keys(old).length + ((old.checklist||[]).length);
+        const newScore = locationRankV657(u)*100 + Object.keys(u).length + ((u.checklist||[]).length);
+        bySerial.set(u.serial, newScore >= oldScore ? u : old);
+      });
+
+      const finalList = [];
+      const seenSerial = new Set();
+
+      Array.from(out.values()).forEach(u => {
+        if(!u) return;
+        if(u.serial){
+          const keep = bySerial.get(u.serial);
+          if(keep && keep.id !== u.id) return;
+          if(seenSerial.has(u.serial)) return;
+          seenSerial.add(u.serial);
+        }
+        finalList.push(u);
+      });
+
+      return finalList;
+    }
+
+    // Override previous merge function with high-load safe logic.
+    if(typeof mergeUPSListsSafe === "function"){
+      mergeUPSListsSafe = mergeUPSListsHighLoadSafeV657;
+    }
+
+    function markUPSLocalEditV657(id, editType){
+      try{
+        const u = UPS_LIST.find(x => x.id === id);
+        if(u){
+          u._updatedAt = new Date().toISOString();
+          u._lastEditType = editType || "edit";
+          u._lastEditedBy = (typeof CURRENT_ENGINEER_NAME !== "undefined") ? CURRENT_ENGINEER_NAME : "";
+        }
+      }catch(e){}
+    }
+    /* ===== END v6.5.7 HIGH LOAD LOCATION PROTECTION ===== */
+
     function applyDashboardCloudPayload(payload) {
       if (!payload) return;
       CLOUD_APPLYING = true;
