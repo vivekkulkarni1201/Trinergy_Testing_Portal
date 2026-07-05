@@ -988,20 +988,29 @@
     /* ===== v6.5.7 HIGH LOAD LOCATION PROTECTION ===== */
     function locationRankV657(u){
       const lt = String((u && u.locationType) || "").toUpperCase();
-      if(lt === "BAY") return 3;
+      if(lt === "CORE" || lt === "STS" || lt === "BAY") return 4;
       if(lt === "TEMP") return 2;
-      if(lt === "RTA") return 2;
+      if(lt === "REWORK" || lt === "RTA") return 2;
       if(lt === "WAITING") return 1;
+      if(lt === "FINISHED") return 3;
       return 0;
     }
 
     function hasRealBayLocationV657(u){
-      return !!(u && String(u.locationType || "").toUpperCase() === "BAY" && u.bay && u.slot);
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      if(lt === "CORE") return !!(u && u.bay && u.slot);
+      if(lt === "STS") return !!(u && u.bay);
+      if(lt === "BAY") return !!(u && u.bay);
+      return false;
     }
 
     function isWeakLocationV657(u){
       const lt = String((u && u.locationType) || "").toUpperCase();
-      return (!u || !lt || lt === "WAITING" || (!u.bay && !u.slot));
+      if(!u || !lt) return true;
+      if(lt === "WAITING") return true;
+      if((lt === "CORE" || lt === "BAY") && (!u.bay || !u.slot)) return true;
+      if(lt === "STS" && !u.bay) return true;
+      return false;
     }
 
     function preserveBestLocationV657(localU, remoteU, mergedU){
@@ -1138,6 +1147,89 @@
       }catch(e){}
     }
     /* ===== END v6.5.7 HIGH LOAD LOCATION PROTECTION ===== */
+
+    
+    /* ===== v6.5.9 ACTIVE LOCATION FIX FOR CORE/STS ===== */
+    function isActiveBayLocationV659(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      if(lt === "CORE") return !!(u && u.bay && u.slot);
+      if(lt === "STS") return !!(u && u.bay);
+      if(lt === "BAY") return !!(u && u.bay);
+      return false;
+    }
+
+    function activeLocationRankV659(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      if(lt === "CORE" || lt === "STS" || lt === "BAY") return 4;
+      if(lt === "TEMP") return 2;
+      if(lt === "REWORK" || lt === "RTA") return 2;
+      if(lt === "WAITING") return 1;
+      if(lt === "FINISHED") return 3;
+      return 0;
+    }
+
+    function weakLocationV659(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      if(!u || !lt) return true;
+      if(lt === "WAITING") return true;
+      if((lt === "CORE" || lt === "BAY") && (!u.bay || !u.slot)) return true;
+      if(lt === "STS" && !u.bay) return true;
+      return false;
+    }
+
+    // Override v6.5.7 helpers with corrected active bay logic.
+    locationRankV657 = activeLocationRankV659;
+    hasRealBayLocationV657 = isActiveBayLocationV659;
+    isWeakLocationV657 = weakLocationV659;
+
+    // Extra protection: active CORE/STS location always wins over TEMP/WAITING unless user explicitly moves it.
+    preserveBestLocationV657 = function(localU, remoteU, mergedU){
+      if(!localU && !remoteU) return mergedU;
+      if(!localU) return mergedU || remoteU;
+      if(!remoteU) return mergedU || localU;
+
+      const localActive = isActiveBayLocationV659(localU);
+      const remoteActive = isActiveBayLocationV659(remoteU);
+      const localRank = activeLocationRankV659(localU);
+      const remoteRank = activeLocationRankV659(remoteU);
+
+      // If either side has active CORE/STS bay, protect it from stale TEMP/WAITING.
+      if(remoteActive && !localActive && weakLocationV659(localU)){
+        mergedU.locationType = remoteU.locationType;
+        mergedU.bay = remoteU.bay;
+        mergedU.slot = remoteU.slot;
+        mergedU.tempHold = remoteU.tempHold;
+        mergedU.rework = remoteU.rework;
+        return mergedU;
+      }
+
+      if(localActive && !remoteActive && weakLocationV659(remoteU)){
+        mergedU.locationType = localU.locationType;
+        mergedU.bay = localU.bay;
+        mergedU.slot = localU.slot;
+        mergedU.tempHold = localU.tempHold;
+        mergedU.rework = localU.rework;
+        return mergedU;
+      }
+
+      // If both locations exist but one is stronger, stronger wins.
+      if(remoteRank > localRank){
+        mergedU.locationType = remoteU.locationType;
+        mergedU.bay = remoteU.bay;
+        mergedU.slot = remoteU.slot;
+        mergedU.tempHold = remoteU.tempHold;
+        mergedU.rework = remoteU.rework;
+      } else if(localRank > remoteRank){
+        mergedU.locationType = localU.locationType;
+        mergedU.bay = localU.bay;
+        mergedU.slot = localU.slot;
+        mergedU.tempHold = localU.tempHold;
+        mergedU.rework = localU.rework;
+      }
+
+      return mergedU;
+    };
+    /* ===== END v6.5.9 ACTIVE LOCATION FIX FOR CORE/STS ===== */
 
     function applyDashboardCloudPayload(payload) {
       if (!payload) return;
