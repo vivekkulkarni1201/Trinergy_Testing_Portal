@@ -566,7 +566,7 @@
           <div class="detail-grid" id="selectedDetails"></div>
           <div class="section-block" id="moveSection"><h4>Move UPS</h4><div class="form-col"><select id="moveBay" onchange="updateMoveSlotOptions()"></select><select id="moveSlot"></select><button class="btn btn-primary" onclick="safeAction(moveSelectedUPS)">Move UPS</button><button id="tempHoldBtn" class="btn btn-warning" onclick="safeAction(moveSelectedToTempHold)">Move to Temporary Holding</button></div></div>
           <div class="section-block" id="stageSection"><h4>Stage Update</h4><div class="form-col"><select id="stageSelect"></select><button class="btn btn-primary" onclick="safeAction(updateSelectedStage)">Update Stage</button></div></div>
-          <div class="section-block"><h4>Timed Events</h4><div id="timedActionButtons" class="button-wrap"></div><div class="tiny muted">Architecture only: timed-event controls are shown here. Timer engine comes next.</div></div>
+          <div class="section-block"><h4>Timed Events</h4><div id="timedActionButtons" class="button-wrap"></div></div>
           <div class="section-block"><h4>Progress Checklist</h4><div id="progressChecklist" class="checklist"></div></div>
           <div class="section-block" id="finalSection"><h4>Final Actions</h4><div class="button-wrap"><button id="toFinishingBtn" class="btn btn-success" onclick="safeAction(markToFinishing)">Mark To Finishing</button><button class="btn btn-danger" onclick="safeAction(returnToAssembly)">Return to Assembly</button></div></div>
         </div>
@@ -1916,7 +1916,7 @@
       return `${ups.type}-${last4}`;
     }
 
-function startTimedEvent(eventKey) {
+async function startTimedEvent(eventKey) {
       const ups = getSelectedUPS();
       if (!ups) return;
 
@@ -1949,6 +1949,13 @@ function startTimedEvent(eventKey) {
         alert("Booster 3 is applicable only for T3X");
         return;
       }
+
+      // v6.6.0: always refresh latest Admin timer settings from cloud before starting timer.
+      try {
+        if (typeof loadAdminConfigFromCloudForDashboard === "function") {
+          await loadAdminConfigFromCloudForDashboard();
+        }
+      } catch(e) { console.warn("Timer admin config refresh failed", e); }
 
       const timerKey = eventKey.startsWith("BOOSTER") ? "BOOSTER_BURN_IN" : eventKey;
       const durationMs = getTimerDurationMs(timerKey);
