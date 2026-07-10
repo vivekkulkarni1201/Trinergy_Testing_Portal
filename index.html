@@ -1231,6 +1231,30 @@
     };
     /* ===== END v6.5.9 ACTIVE LOCATION FIX FOR CORE/STS ===== */
 
+    
+    /* ===== v6.6.2 TIMESTAMP AWARE LOCATION MERGE ===== */
+    const __oldMergeUPSRecordV657_v662 = typeof mergeUPSRecordV657 === "function" ? mergeUPSRecordV657 : null;
+    if(__oldMergeUPSRecordV657_v662){
+      mergeUPSRecordV657 = function(localU, remoteU, preferLocal){
+        const merged = __oldMergeUPSRecordV657_v662(localU, remoteU, preferLocal);
+        if(localU && remoteU){
+          const localTs = locationChangedMsV662(localU);
+          const remoteTs = locationChangedMsV662(remoteU);
+
+          if(localTs > remoteTs){
+            copyLocationV662(localU, merged);
+          } else if(remoteTs > localTs){
+            copyLocationV662(remoteU, merged);
+          } else {
+            if(isActiveLocationV661(localU) && isHoldingLikeV661(remoteU)) copyLocationV662(localU, merged);
+            else if(isActiveLocationV661(remoteU) && isHoldingLikeV661(localU)) copyLocationV662(remoteU, merged);
+          }
+        }
+        return merged;
+      };
+    }
+    /* ===== END v6.6.2 TIMESTAMP AWARE LOCATION MERGE ===== */
+
     function applyDashboardCloudPayload(payload) {
       if (!payload) return;
       CLOUD_APPLYING = true;
@@ -1742,6 +1766,31 @@
       }
     }
 
+    
+    /* ===== v6.6.2 INTENTIONAL LOCATION MOVE FIX ===== */
+    function markIntentionalLocationMoveV662(ups, action){
+      if(!ups) return;
+      ups._locationChangedAt = new Date().toISOString();
+      ups._locationAction = action || "move";
+      ups._lastEditedBy = (typeof CURRENT_ENGINEER_NAME !== "undefined") ? CURRENT_ENGINEER_NAME : "";
+    }
+    function locationChangedMsV662(u){
+      const t = u && u._locationChangedAt ? new Date(u._locationChangedAt).getTime() : 0;
+      return Number.isFinite(t) ? t : 0;
+    }
+    function copyLocationV662(fromU, toU){
+      if(!fromU || !toU) return;
+      toU.locationType = fromU.locationType;
+      toU.bay = fromU.bay;
+      toU.slot = fromU.slot;
+      toU.tempHold = fromU.tempHold;
+      toU.rework = fromU.rework;
+      toU._locationChangedAt = fromU._locationChangedAt;
+      toU._locationAction = fromU._locationAction;
+      toU._lastEditedBy = fromU._lastEditedBy;
+    }
+    /* ===== END v6.6.2 INTENTIONAL LOCATION MOVE FIX ===== */
+
     function moveSelectedUPS() {
       const ups = getSelectedUPS();
       if (ups) syncChecklistWithAdminStages(ups);
@@ -1753,14 +1802,14 @@
 
       if (ups.type === "TST") {
         if (isOccupiedSTS(moveBay, ups.id)) return alert("Target STS bay is occupied. Move one UPS to Temporary Holding Area if interchange is needed.");
-        ups.locationType = "STS"; ups.bay = moveBay; ups.slot = null; ups.tempHold = false; ups.rework = false;
+        ups.locationType = "STS"; ups.bay = moveBay; ups.slot = null; ups.tempHold = false; ups.rework = false; markIntentionalLocationMoveV662(ups, "move_sts");
         if (moveBay === "STS TEST") {
           if (!getStsTestStages().includes(ups.stage)) ups.stage = null;
         } else if (!STS_HEATRUN_STAGES.includes(ups.stage)) ups.stage = "Burn In";
       } else {
         if (!moveSlot) return alert("Select target slot");
         if (isOccupiedCoreSlot(moveBay, moveSlot, ups.id)) return alert("Target CORE slot is occupied");
-        ups.locationType = "CORE"; ups.bay = moveBay; ups.slot = moveSlot; ups.tempHold = false; ups.rework = false;
+        ups.locationType = "CORE"; ups.bay = moveBay; ups.slot = moveSlot; ups.tempHold = false; ups.rework = false; markIntentionalLocationMoveV662(ups, "move_core");
         if (moveSlot === "LV" && !getLvStages().includes(ups.stage)) ups.stage = null;
         if (moveSlot === "HV" && !HV_STAGES.includes(ups.stage)) ups.stage = "25% Waveforms";
       }
@@ -1783,6 +1832,7 @@
       ups.slot = null;
       ups.tempHold = true;
       ups.rework = false;
+      markIntentionalLocationMoveV662(ups, "move_temp");
       render();
     }
 
@@ -1835,9 +1885,45 @@
       }
     }
 
+    
+    /* ===== v6.6.1 STRICT LOCATION GUARD ===== */
+    function snapshotLocationV661(ups){
+      if(!ups) return null;
+      return {
+        locationType: ups.locationType,
+        bay: ups.bay,
+        slot: ups.slot,
+        tempHold: ups.tempHold,
+        rework: ups.rework
+      };
+    }
+    function restoreLocationV661(ups, snap){
+      if(!ups || !snap) return;
+      ups.locationType = snap.locationType;
+      ups.bay = snap.bay;
+      ups.slot = snap.slot;
+      ups.tempHold = snap.tempHold;
+      ups.rework = snap.rework;
+      ups._locationGuardAt = new Date().toISOString();
+    }
+    function protectLocationOnNonMoveV661(before, after){
+      if(!before || !after) return;
+      restoreLocationV661(after, before);
+    }
+    function isActiveLocationV661(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      return (lt === "CORE" && u.bay && u.slot) || (lt === "STS" && u.bay);
+    }
+    function isHoldingLikeV661(u){
+      const lt = String((u && u.locationType) || "").toUpperCase();
+      return lt === "TEMP" || lt === "WAITING" || lt === "REWORK" || lt === "RTA";
+    }
+    /* ===== END v6.6.1 STRICT LOCATION GUARD ===== */
+
     function updateSelectedStage() {
       const ups = getSelectedUPS();
       if (!ups) return;
+      const locSnap = snapshotLocationV661(ups);
       if (isTimedRunning(ups)) return alert("This UPS is locked while timed event is running");
       const stage = document.getElementById("stageSelect").value;
       if (isTimedStageName(stage)) {
@@ -1847,6 +1933,7 @@
       if (!stage) return alert("Select stage");
       ups.stage = stage;
       markChecklistStage(ups, stage);
+      protectLocationOnNonMoveV661(locSnap, ups);
       render();
     }
 
@@ -1868,6 +1955,7 @@
       ups.slot = null;
       ups.tempHold = false;
       ups.rework = false;
+      markIntentionalLocationMoveV662(ups, "move_finished");
       SELECTED_UPS_ID = null;
       render();
     }
@@ -1884,6 +1972,7 @@
       ups.bay = null;
       ups.slot = null;
       ups.tempHold = false;
+      markIntentionalLocationMoveV662(ups, "move_rework");
       SELECTED_UPS_ID = null;
       render();
     }
@@ -1916,7 +2005,7 @@
       return `${ups.type}-${last4}`;
     }
 
-async function startTimedEvent(eventKey) {
+async async function startTimedEvent(eventKey) {
       const ups = getSelectedUPS();
       if (!ups) return;
 
@@ -1957,10 +2046,18 @@ async function startTimedEvent(eventKey) {
         }
       } catch(e) { console.warn("Timer admin config refresh failed", e); }
 
+      // v6.6.1: always refresh latest Admin timer settings from cloud before starting timer.
+      try {
+        if (typeof loadAdminConfigFromCloudForDashboard === "function") {
+          await loadAdminConfigFromCloudForDashboard();
+        }
+      } catch(e) { console.warn("Timer admin config refresh failed", e); }
+
       const timerKey = eventKey.startsWith("BOOSTER") ? "BOOSTER_BURN_IN" : eventKey;
       const durationMs = getTimerDurationMs(timerKey);
       const now = Date.now();
 
+      const locSnap = snapshotLocationV661(ups);
       ups.timer = {
         running: true,
         eventKey,
@@ -1969,12 +2066,14 @@ async function startTimedEvent(eventKey) {
         endsAt: now + durationMs,
         durationMs
       };
+      protectLocationOnNonMoveV661(locSnap, ups);
 
       render();
     }
 
     function completeTimedEvent(ups) {
       if (!ups || !ups.timer) return;
+      const locSnap = snapshotLocationV661(ups);
 
       const eventKey = ups.timer.eventKey;
 
@@ -1992,6 +2091,7 @@ async function startTimedEvent(eventKey) {
       if (eventKey === "BOOSTER_3" && ups.checklist.HEATRUN) ups.checklist.HEATRUN["Booster 3"] = true;
 
       ups.timer = null;
+      protectLocationOnNonMoveV661(locSnap, ups);
     }
 
     
@@ -2384,6 +2484,7 @@ function renderBaySlots() {
       ups.slot = null;
       ups.tempHold = true;
       ups.rework = false;
+      markIntentionalLocationMoveV662(ups, "move_temp");
       render();
     }
 

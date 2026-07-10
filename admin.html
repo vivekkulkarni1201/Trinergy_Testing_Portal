@@ -1708,5 +1708,73 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
 /* ===== END v6.6.0 OLD SERIAL TAB FINAL FIX ===== */
 </script>
 
+
+<script>
+/* ===== v6.6.1 TIMER CLOUD SAVE HARD FIX ===== */
+(function(){
+  function getElByAny(ids){
+    for(const id of ids){
+      const el = document.getElementById(id);
+      if(el) return el;
+    }
+    return null;
+  }
+  function readTimerValue(ids, fallback){
+    const el = Array.isArray(ids) ? getElByAny(ids) : document.getElementById(ids);
+    const v = el ? Number(el.value) : 0;
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : fallback;
+  }
+
+  window.saveTimerSettingsHard = async function(){
+    let cfg = {};
+    try{ cfg = JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}"); }catch(e){ cfg = {}; }
+
+    const modeEl = getElByAny(["timerMode","timerModeSelect"]) || document.querySelector("#timers select");
+
+    cfg.timers = {
+      mode: modeEl ? modeEl.value : "TEST MODE",
+      coreTest: readTimerValue(["coreBurnTestMin","coreTest","coreBurnTest"], 1),
+      tstTest: readTimerValue(["tstBurnTestMin","tstTest","tstBurnTest"], 1),
+      boostTest: readTimerValue(["boosterTestMin","boostTest","boosterBurnTest"], 1),
+      coreReal: readTimerValue(["coreBurnRealMin","coreReal","coreBurnReal"], 240),
+      tstReal: readTimerValue(["tstBurnRealMin","tstReal","tstBurnReal"], 60),
+      boostReal: readTimerValue(["boosterRealMin","boostReal","boosterBurnReal"], 30),
+      updatedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem("trinergyAdminV3", JSON.stringify(cfg));
+
+    try{
+      if(typeof adminCloudSaveRow === "function") await adminCloudSaveRow("admin", cfg);
+      else if(typeof cloudSaveRow === "function") await cloudSaveRow("admin", cfg);
+      else if(typeof supabaseClient !== "undefined") await supabaseClient.from("ups_data").upsert({id:"admin", data:cfg});
+      alert("Timer settings saved to cloud ✔");
+    }catch(e){
+      console.warn("Timer cloud save failed", e);
+      alert("Timer saved locally, but cloud save failed. Check console.");
+    }
+  };
+
+  function hookTimerButton(){
+    const btn = Array.from(document.querySelectorAll("button")).find(b => 
+      String(b.textContent || "").toLowerCase().includes("save timer")
+    );
+    if(btn && !btn.__timerHardHooked){
+      btn.__timerHardHooked = true;
+      btn.onclick = function(e){
+        if(e) e.preventDefault();
+        saveTimerSettingsHard();
+      };
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", hookTimerButton);
+  setTimeout(hookTimerButton, 500);
+  setTimeout(hookTimerButton, 1500);
+  setInterval(hookTimerButton, 3000);
+})();
+/* ===== END v6.6.1 TIMER CLOUD SAVE HARD FIX ===== */
+</script>
+
 </body>
 </html>
