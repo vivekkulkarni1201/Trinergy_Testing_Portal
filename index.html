@@ -2005,7 +2005,7 @@
       return `${ups.type}-${last4}`;
     }
 
-async function startTimedEvent(eventKey) {
+async async function startTimedEvent(eventKey) {
       const ups = getSelectedUPS();
       if (!ups) return;
 
@@ -2052,6 +2052,15 @@ async function startTimedEvent(eventKey) {
           await loadAdminConfigFromCloudForDashboard();
         }
       } catch(e) { console.warn("Timer admin config refresh failed", e); }
+
+      /* v6.6.4 TIMER CONFIG VERIFIED LOAD */
+      try {
+        if (typeof loadAdminConfigFromCloudForDashboard === "function") {
+          await loadAdminConfigFromCloudForDashboard();
+        }
+      } catch(e) {
+        console.warn("Latest timer config load failed", e);
+      }
 
       const timerKey = eventKey.startsWith("BOOSTER") ? "BOOSTER_BURN_IN" : eventKey;
       const durationMs = getTimerDurationMs(timerKey);
