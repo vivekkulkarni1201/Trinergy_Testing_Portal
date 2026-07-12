@@ -391,7 +391,7 @@ window.clearEngineerForm = window.clearEngineerForm || function(){};
 </div></section>
 
 <section id="timers" class="tab-content"><div class="panel">
-  <h2>Timer Settings</h2><div class="hint">Whole minutes only. For production timers select REAL MODE and Save. TEST MODE uses the 1-minute test values.</div>
+  <h2>Timer Settings</h2><div class="hint">Whole minutes only. TEST MODE uses Test values; REAL MODE uses Real values. Save applies to newly-started timers.</div>
   <div class="form-grid">
     <div><label>Mode</label><select id="timerMode"><option>TEST MODE</option><option>REAL MODE</option></select></div>
     <div><label>Core Burn Test Min</label><input id="coreTest" type="number" min="1" step="1" value="1"></div>
@@ -654,7 +654,39 @@ function lockHistorical(){toast("Historical lock noted")}
 function clearHistorical(){if(confirm("Clear this historical category?")){state.hist[state.histCategory]={};save();renderHistorical();toast("Historical cleared")}}
 
 function loadTimers(){timerMode.value=state.timers.mode;coreTest.value=state.timers.coreTest;tstTest.value=state.timers.tstTest;boostTest.value=state.timers.boostTest;coreReal.value=state.timers.coreReal;tstReal.value=state.timers.tstReal;boostReal.value=state.timers.boostReal}
-function saveTimers(){state.timers={mode:timerMode.value,coreTest:Math.max(1,Math.round(+coreTest.value||1)),tstTest:Math.max(1,Math.round(+tstTest.value||1)),boostTest:Math.max(1,Math.round(+boostTest.value||1)),coreReal:Math.max(1,Math.round(+coreReal.value||240)),tstReal:Math.max(1,Math.round(+tstReal.value||60)),boostReal:Math.max(1,Math.round(+boostReal.value||30))};save();loadTimers();toast("Timer settings saved")}
+async function saveTimers(){
+  state.timers={
+    mode:timerMode.value,
+    coreTest:Math.max(1,Math.round(+coreTest.value||1)),
+    tstTest:Math.max(1,Math.round(+tstTest.value||1)),
+    boostTest:Math.max(1,Math.round(+boostTest.value||1)),
+    coreReal:Math.max(1,Math.round(+coreReal.value||240)),
+    tstReal:Math.max(1,Math.round(+tstReal.value||60)),
+    boostReal:Math.max(1,Math.round(+boostReal.value||30)),
+    updatedAt:new Date().toISOString()
+  };
+
+  localStorage.setItem("trinergyAdminV3",JSON.stringify(state));
+
+  try{
+    if(adminCloudClient){
+      ADMIN_CLOUD_LAST_SAVE_TS=Date.now();
+      const {error}=await adminCloudClient.from("ups_data").upsert({id:"admin",data:state});
+      if(error) throw error;
+    }
+    loadTimers();
+    toast("Timer settings saved");
+    alert(
+      "Timer Settings Saved ✔\n\n"+
+      "Mode: "+state.timers.mode+"\n"+
+      "Test — Core: "+state.timers.coreTest+" min, TST: "+state.timers.tstTest+" min, Booster: "+state.timers.boostTest+" min\n"+
+      "Real — Core: "+state.timers.coreReal+" min, TST: "+state.timers.tstReal+" min, Booster: "+state.timers.boostReal+" min"
+    );
+  }catch(e){
+    console.error("Timer settings save failed",e);
+    alert("Timer settings cloud save failed. Please share Console error.");
+  }
+}
 
 function updateBayRoleInfo(){const r=bayRoleMap[bayType.value];baySectionsPreview.value=r.sections;bayUpsPreview.value=r.ups}
 function addBay(){if(!bayName.value.trim())return toast("Enter bay name");const r=bayRoleMap[bayType.value];state.bays.push({name:bayName.value.trim(),type:r.role,sections:r.sections,ups:r.ups,status:"Active"});save();renderBays();toast("Bay added")}
@@ -1568,7 +1600,7 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
   const VALID = new Set(["targets","historical","timers","bays","stages","serials","oldserial","reports","engineers"]);
 
   function getTabIdFromButton(btn){
-    if(!btn) return "";
+    if(!btn || !btn.classList || !btn.classList.contains("tab")) return "";
     if(btn.dataset && btn.dataset.tab) return btn.dataset.tab;
 
     const onclick = String(btn.getAttribute("onclick") || "");
@@ -1622,7 +1654,7 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
   try { showTab = window.showTab; } catch(e){}
 
   document.addEventListener("click", function(e){
-    const btn = e.target.closest && e.target.closest("button");
+    const btn = e.target.closest && e.target.closest("button.tab");
     const tabId = getTabIdFromButton(btn);
     if(!tabId) return;
 
@@ -1712,111 +1744,7 @@ applyAdminLock();initDropdowns();renderTargets();setHistCategory(state.histCateg
 
 
 
-<script>
-/* ===== v6.6.4 VERIFIED TIMER CLOUD SAVE ===== */
-(function(){
-  function val(id, fallback){
-    const el = document.getElementById(id);
-    const n = el ? Number(el.value) : NaN;
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : fallback;
-  }
 
-  async function saveTimersVerifiedV664(){
-    const modeEl = document.getElementById("timerMode");
-    const timers = {
-      mode: modeEl ? modeEl.value : "TEST MODE",
-      coreTest: val("coreTest", 1),
-      tstTest: val("tstTest", 1),
-      boostTest: val("boostTest", 1),
-      coreReal: val("coreReal", 240),
-      tstReal: val("tstReal", 60),
-      boostReal: val("boostReal", 30),
-      updatedAt: new Date().toISOString()
-    };
-
-    // Update the real global admin state first.
-    if(typeof state !== "undefined" && state){
-      state.timers = timers;
-      try{
-        localStorage.setItem("trinergyAdminV3", JSON.stringify(state));
-      }catch(e){}
-    }
-
-    try{
-      if(!adminCloudClient){
-        alert("Timer settings saved locally. Cloud client is unavailable.");
-        return;
-      }
-
-      // Direct upsert: do not depend on readiness/debounce flags.
-      const payload = (typeof state !== "undefined" && state) ? state : {
-        ...(JSON.parse(localStorage.getItem("trinergyAdminV3") || "{}")),
-        timers
-      };
-
-      ADMIN_CLOUD_LAST_SAVE_TS = Date.now();
-
-      const { error } = await adminCloudClient
-        .from("ups_data")
-        .upsert({ id: "admin", data: payload });
-
-      if(error) throw error;
-
-      // Read back from cloud and verify actual saved values.
-      const { data, error: readError } = await adminCloudClient
-        .from("ups_data")
-        .select("*")
-        .eq("id", "admin")
-        .maybeSingle();
-
-      if(readError) throw readError;
-
-      const saved = data && data.data && data.data.timers ? data.data.timers : null;
-      if(!saved || saved.mode !== timers.mode ||
-         Number(saved.coreTest) !== Number(timers.coreTest) ||
-         Number(saved.coreReal) !== Number(timers.coreReal)){
-        throw new Error("Cloud timer verification mismatch");
-      }
-
-      if(typeof state !== "undefined" && state) state.timers = saved;
-      try{
-        localStorage.setItem("trinergyAdminV3", JSON.stringify(data.data));
-      }catch(e){}
-
-      if(typeof loadTimers === "function") loadTimers();
-
-      alert(
-        "Timer settings saved and verified ✔\n\n" +
-        "Mode: " + saved.mode + "\n" +
-        "Test: Core " + saved.coreTest + " min | TST " + saved.tstTest + " min | Booster " + saved.boostTest + " min\n" +
-        "Real: Core " + saved.coreReal + " min | TST " + saved.tstReal + " min | Booster " + saved.boostReal + " min"
-      );
-    }catch(e){
-      console.error("Verified timer save failed", e);
-      alert("Timer settings cloud save FAILED. Open Console and share the red error.");
-    }
-  }
-
-  window.saveTimers = saveTimersVerifiedV664;
-
-  function hook(){
-    const btn = Array.from(document.querySelectorAll("button"))
-      .find(b => String(b.textContent || "").trim().toLowerCase() === "save timer settings");
-    if(btn){
-      btn.onclick = function(e){
-        if(e) e.preventDefault();
-        saveTimersVerifiedV664();
-      };
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", hook);
-  setTimeout(hook, 300);
-  setTimeout(hook, 1000);
-  setInterval(hook, 3000);
-})();
-/* ===== END v6.6.4 VERIFIED TIMER CLOUD SAVE ===== */
-</script>
 
 </body>
 </html>
