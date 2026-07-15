@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="trinergy-build" content="6.8.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <title>Trinergy Admin Control Panel v4.2</title>
 <style>
@@ -268,6 +272,17 @@ async function downloadMonthlyExcelReport(){
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
+<script>
+/* TRINERGY AUTO UPDATE v6.8.0 */
+(function(){
+const LOCAL_BUILD="6.8.0",URL=new URL("version.json",location.href).href.split("?")[0];let last=0,remote=LOCAL_BUILD,busy=null;window.TRINERGY_BUILD=LOCAL_BUILD;window.TRINERGY_UPDATE_REQUIRED=false;
+async function get(force=false){if(!force&&Date.now()-last<5000)return remote;if(busy)return busy;busy=(async()=>{try{const r=await fetch(URL+"?ts="+Date.now(),{cache:"no-store",headers:{"Cache-Control":"no-cache,no-store,must-revalidate"}});if(!r.ok)throw Error(r.status);const d=await r.json();remote=String(d.build||LOCAL_BUILD).replace(/^v/i,"");}catch(e){console.warn("Version check unavailable",e);remote=LOCAL_BUILD;}last=Date.now();busy=null;return remote;})();return busy;}
+function overlay(v){if(document.getElementById("trinergyUpdateOverlay"))return;window.TRINERGY_UPDATE_REQUIRED=true;const x=document.createElement("div");x.id="trinergyUpdateOverlay";x.style.cssText="position:fixed;inset:0;z-index:2147483647;background:rgba(4,13,31,.96);display:flex;align-items:center;justify-content:center;color:white;font-family:Arial;text-align:center";x.innerHTML='<div style="max-width:560px;padding:36px;border:1px solid #35517d;border-radius:18px;background:#142442"><div style="font-size:42px">🔄</div><h2>Portal Update Available</h2><p>Build '+LOCAL_BUILD+' → '+v+'</p><p>Latest version automatically load ho rahi hai…</p></div>';document.body.appendChild(x);}
+async function check(force=false){const v=await get(force);if(v!==LOCAL_BUILD){overlay(v);setTimeout(()=>{const u=location.href.split("#")[0].split("?")[0];location.replace(u+"?v="+encodeURIComponent(v)+"&ts="+Date.now());},1200);return false;}return true;}
+window.TrinergyVersionGuard={localBuild:LOCAL_BUILD,check,async canWrite(){if(window.TRINERGY_UPDATE_REQUIRED)return false;return await check(false);}};
+document.addEventListener("DOMContentLoaded",()=>{const b=document.createElement("span");b.textContent="BUILD v6.8.0";b.style.cssText="display:inline-flex;padding:5px 10px;margin-left:8px;border-radius:999px;border:1px solid #35517d;background:#16294b;color:#a9bee3;font-size:11px;font-weight:800";(document.querySelector("header")||document.querySelector(".header")||document.querySelector("h1"))?.appendChild(b);check(true);});window.addEventListener("focus",()=>check(true));document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")check(true);});setInterval(()=>check(false),30000);
+})();
+</script>
 
 <script>
 /* ===== v6.4.7 ENGINEER FUNCTION BOOTSTRAP ===== */
@@ -503,6 +518,7 @@ async function adminCloudLoadRow(rowId){
 
 async function adminCloudSaveRow(rowId, payload){
   if(!adminCloudClient || !ADMIN_CLOUD_READY || ADMIN_CLOUD_APPLYING) return;
+  if(window.TrinergyVersionGuard && !(await window.TrinergyVersionGuard.canWrite())) return;
   try {
     ADMIN_CLOUD_LAST_SAVE_TS = Date.now();
     const {error} = await adminCloudClient.from("ups_data").upsert({ id: rowId, data: payload });
@@ -670,6 +686,7 @@ async function saveTimers(){
 
   try{
     if(adminCloudClient){
+      if(window.TrinergyVersionGuard && !(await window.TrinergyVersionGuard.canWrite())) return;
       ADMIN_CLOUD_LAST_SAVE_TS=Date.now();
       const {error}=await adminCloudClient.from("ups_data").upsert({id:"admin",data:state});
       if(error) throw error;
