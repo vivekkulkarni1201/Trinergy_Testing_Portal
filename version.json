@@ -1,5 +1,6 @@
 {
-  "build": "6.8.0",
-  "releasedAt": "2026-07-14",
-  "channel": "production"
+  "build": "6.8.1",
+  "releasedAt": "2026-07-15",
+  "channel": "production",
+  "notes": "Fix automatic updater URL name collision and restore build badge/version checking."
 }
