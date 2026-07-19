@@ -130,142 +130,229 @@ function worksheetFromAOA(rows){
 function addSheet(wb, name, rows){
   XLSX.utils.book_append_sheet(wb, worksheetFromAOA(rows), name.substring(0,31));
 }
-async function downloadMonthlyExcelReport(){
-  if(typeof XLSX === "undefined"){
-    alert("Excel export library not loaded. Check internet/CDN access and refresh once.");
-    return;
+
+function reportDateInfo(value){
+  if(!value) return {date:"", year:"", month:"", monthNo:0};
+  const dt = new Date(value);
+  if(Number.isNaN(dt.getTime())) return {date:String(value), year:"", month:"", monthNo:0};
+  return {
+    date: dt.toLocaleDateString("en-GB"),
+    iso: dt.toISOString(),
+    year: String(dt.getFullYear()),
+    month: months[dt.getMonth()],
+    monthNo: dt.getMonth()+1
+  };
+}
+function receivedInfoForUPS(u){
+  if(u && u.createdAt) return reportDateInfo(u.createdAt);
+  const src = String((u && (u.monthKey || u.serial)) || "");
+  const m = src.match(/^(\d{4})(\d{2})/);
+  if(m){
+    const monthNo = Number(m[2]);
+    return {date:"", year:m[1], month:months[monthNo-1] || "", monthNo};
+  }
+  return {date:"",year:"",month:"",monthNo:0};
+}
+function completedInfoForUPS(u){
+  return reportDateInfo(u && (u.completedDate || (isCompletedUPS(u) ? u.updatedAt : "")));
+}
+function locationTextForReport(u){
+  if(!u) return "";
+  if(u.toFinishing) return "FINISHED";
+  if(u.rework) return "REWORK HOLDING";
+  if(u.tempHold) return "TEMPORARY HOLDING";
+  if(u.locationType === "CORE") return [u.bay,u.slot].filter(Boolean).join(" ");
+  if(u.locationType === "STS") return u.bay || "STS";
+  return u.locationType || "";
+}
+function excelSafeName(x){ return String(x || "").replace(/[\\/:*?"<>|]/g,"-"); }
+function excelDownloadAllowed(){
+  return typeof XLSX !== "undefined";
+}
+function buildMonthlyManagementData(upsList, selectedYear){
+  const typeList=["T3X","T2X","TST"];
+  const data={};
+  months.forEach(m=>{
+    data[m]={};
+    typeList.forEach(t=>data[m][t]={received:0,completed:0,rta:0,pending:0});
+  });
+
+  (upsList||[]).forEach(u=>{
+    if(!u || !typeList.includes(u.type)) return;
+    const ri=receivedInfoForUPS(u);
+    const ci=completedInfoForUPS(u);
+
+    if(ri.year===String(selectedYear) && data[ri.month]){
+      data[ri.month][u.type].received++;
+    }
+    if(ci.year===String(selectedYear) && data[ci.month]){
+      data[ci.month][u.type].completed++;
+      if(u.everReturned || u.rework) data[ci.month][u.type].rta++;
+    }
+  });
+
+  // Add historical manual completed/RTA counts.
+  months.forEach(m=>typeList.forEach(t=>{
+    data[m][t].completed += getHistoricalNumber("Completed", selectedYear, m, t);
+    data[m][t].rta += getHistoricalNumber("RTA", selectedYear, m, t);
+    data[m][t].pending = Math.max(0, data[m][t].received - data[m][t].completed);
+  }));
+  return data;
+}
+async function downloadMonthlyExcelReport(options={}){
+  if(!excelDownloadAllowed()){
+    alert("Excel export library not loaded. Please check internet connection and refresh.");
+    return false;
   }
 
-  const selectedYear = reportYear ? reportYear.value : String(new Date().getFullYear());
+  const selectedYear = String(options.year || (reportYear ? reportYear.value : new Date().getFullYear()));
+  const onlyMonth = options.month || "";
   const generatedAt = new Date();
   const typeList = ["T3X","T2X","TST"];
 
-  let mainPayload = null;
-  try { mainPayload = await adminCloudLoadRow("main"); } catch(e) { console.warn("main payload load failed", e); }
-  const upsList = mainPayload && Array.isArray(mainPayload.UPS_LIST) ? mainPayload.UPS_LIST : [];
+  let mainPayload=null;
+  try{ mainPayload=await adminCloudLoadRow("main"); }
+  catch(e){ console.warn("Main cloud payload load failed",e); }
+  const upsList=mainPayload && Array.isArray(mainPayload.UPS_LIST) ? mainPayload.UPS_LIST : [];
+  const data=buildMonthlyManagementData(upsList,selectedYear);
 
-  const liveCompletedSerialRows = [];
-  const liveMonthly = {};
-  months.forEach(m => liveMonthly[m] = {T3X:0,T2X:0,TST:0,rta:0});
-
-  upsList.forEach(u => {
-    if(!u || !u.type) return;
-    const t = u.type;
-    const m = completedMonthForUPS(u);
-    const y = completedYearForUPS(u);
-    if(String(y) !== String(selectedYear)) return;
-
-    if(isCompletedUPS(u) && liveMonthly[m] && liveMonthly[m][t] !== undefined){
-      liveMonthly[m][t] += 1;
-      liveCompletedSerialRows.push([
-        u.serial || "",
-        t,
-        m,
-        y,
-        u.weekTag || "",
-        u.bay || "",
-        u.slot || "",
-        u.stage || "",
-        u.completedDate || "",
-        u.toFinishing ? "YES" : "",
-        u.everReturned ? "YES" : "",
-        u.rework ? "YES" : ""
-      ]);
-    }
-
-    if((u.everReturned || u.rework) && liveMonthly[m]){
-      liveMonthly[m].rta += 1;
-    }
-  });
-
-  const data = {};
-  months.forEach(m=>{
-    data[m] = {T3X:0,T2X:0,TST:0,rta:0};
-    typeList.forEach(t=>{
-      data[m][t] = getHistoricalNumber("Completed", selectedYear, m, t) + safeNum(liveMonthly[m][t]);
-      data[m].rta += getHistoricalNumber("RTA", selectedYear, m, t);
-    });
-    data[m].rta += safeNum(liveMonthly[m].rta);
-  });
-
-  // Dashboard Summary: this month + cumulative till-date
-  const summaryRows = [
-    ["TRINERGY MONTHLY PROGRESS REPORT"],
-    ["Generated At", generatedAt.toLocaleString()],
-    ["Year", selectedYear],
+  // Executive summary
+  const summaryRows=[
+    ["TRINERGY TESTING – MANAGEMENT REPORT"],
+    ["Report Year",selectedYear],
+    ["Report Period",onlyMonth || "Full Year"],
+    ["Generated At",generatedAt.toLocaleString("en-GB")],
     [],
-    ["Month", "T3X Monthly", "T2X Monthly", "TST Monthly", "Total Monthly", "RTA/Fault Monthly", "FPY % Monthly", "T3X Cumulative", "T2X Cumulative", "TST Cumulative", "Total Cumulative", "RTA/Fault Cumulative", "FPY % Cumulative"]
+    ["Month","T3X Received","T3X Completed","T3X Pending","T2X Received","T2X Completed","T2X Pending","TST Received","TST Completed","TST Pending","Total Received","Total Completed","Total Pending","RTA / Fault","FPY %","Cumulative Received","Cumulative Completed"]
   ];
-
-  const cum = {T3X:0,T2X:0,TST:0,rta:0};
+  let cumReceived=0,cumCompleted=0;
   months.forEach(m=>{
-    const row = data[m];
-    const total = row.T3X + row.T2X + row.TST;
-    cum.T3X += row.T3X; cum.T2X += row.T2X; cum.TST += row.TST; cum.rta += row.rta;
-    const cumTotal = cum.T3X + cum.T2X + cum.TST;
+    if(onlyMonth && m!==onlyMonth) return;
+    let totalR=0,totalC=0,totalP=0,totalRta=0;
+    typeList.forEach(t=>{
+      totalR+=data[m][t].received;
+      totalC+=data[m][t].completed;
+      totalP+=data[m][t].pending;
+      totalRta+=data[m][t].rta;
+    });
+    cumReceived+=totalR; cumCompleted+=totalC;
+    const fpy=totalC ? Math.max(0,Math.round(((totalC-totalRta)/totalC)*100)) : "";
     summaryRows.push([
       m,
-      row.T3X, row.T2X, row.TST, total, row.rta, fpyPercent(total,row.rta),
-      cum.T3X, cum.T2X, cum.TST, cumTotal, cum.rta, fpyPercent(cumTotal,cum.rta)
+      data[m].T3X.received,data[m].T3X.completed,data[m].T3X.pending,
+      data[m].T2X.received,data[m].T2X.completed,data[m].T2X.pending,
+      data[m].TST.received,data[m].TST.completed,data[m].TST.pending,
+      totalR,totalC,totalP,totalRta,fpy,cumReceived,cumCompleted
     ]);
   });
 
-  const typeWiseRows = [
-    ["Month", "Type", "Monthly Completed", "Cumulative Completed"],
-  ];
+  // Year summary by type
+  const yearRows=[["Year","Type","Received","Completed","Pending","RTA / Fault","FPY %"]];
   typeList.forEach(t=>{
-    let running = 0;
+    let r=0,c=0,p=0,rta=0;
     months.forEach(m=>{
-      running += data[m][t] || 0;
-      typeWiseRows.push([m, t, data[m][t] || 0, running]);
+      if(onlyMonth && m!==onlyMonth) return;
+      r+=data[m][t].received;c+=data[m][t].completed;p+=data[m][t].pending;rta+=data[m][t].rta;
     });
-    typeWiseRows.push([]);
+    yearRows.push([selectedYear,t,r,c,p,rta,c?Math.max(0,Math.round(((c-rta)/c)*100)):""]);
   });
 
-  const kpiRows = [
-    ["Month","Completed","RTA/Fault","FPY %","Cumulative Completed","Cumulative RTA/Fault","Cumulative FPY %"]
-  ];
-  let cDone = 0, cRta = 0;
+  // Serial audit
+  const serialRows=[[
+    "Serial Number","UPS Type","Generated By Engineer","Received Date","Received Month",
+    "Week Tag","Current Status / Location","Current Stage","Completed Date",
+    "Completion Month","RTA Ever","Temporary Holding","Last Edited By","Last Updated"
+  ]];
+  (upsList||[])
+    .filter(u=>{
+      const ri=receivedInfoForUPS(u),ci=completedInfoForUPS(u);
+      const yearMatch=ri.year===selectedYear || ci.year===selectedYear;
+      const monthMatch=!onlyMonth || ri.month===onlyMonth || ci.month===onlyMonth;
+      return yearMatch && monthMatch;
+    })
+    .sort((a,b)=>String(a.serial||"").localeCompare(String(b.serial||"")))
+    .forEach(u=>{
+      const ri=receivedInfoForUPS(u),ci=completedInfoForUPS(u);
+      serialRows.push([
+        u.serial||"",u.type||"",u.createdBy||u.generatedBy||"Legacy / Not Recorded",
+        ri.date,ri.month,u.weekTag||"",locationTextForReport(u),u.stage||"Not Started",
+        ci.date,ci.month,u.everReturned?"YES":"NO",u.tempHold?"YES":"NO",
+        u._lastEditedBy||"",reportDateInfo(u._updatedAt||u.updatedAt).date
+      ]);
+    });
+  if(serialRows.length===1) serialRows.push(["No serial records found for selected period"]);
+
+  // Completed serial list
+  const completedRows=[[
+    "Serial Number","Type","Generated By","Received Date","Completed Date",
+    "Testing Lead Time (Days)","Week Tag","Final Stage","RTA / Fault"
+  ]];
+  (upsList||[]).filter(isCompletedUPS).forEach(u=>{
+    const ri=receivedInfoForUPS(u),ci=completedInfoForUPS(u);
+    if(ci.year!==selectedYear || (onlyMonth && ci.month!==onlyMonth)) return;
+    let lead="";
+    if(u.createdAt && u.completedDate){
+      lead=Math.max(0,Math.round((new Date(u.completedDate)-new Date(u.createdAt))/86400000*10)/10);
+    }
+    completedRows.push([
+      u.serial||"",u.type||"",u.createdBy||"Legacy / Not Recorded",
+      ri.date,ci.date,lead,u.weekTag||"",u.stage||"",u.everReturned?"YES":"NO"
+    ]);
+  });
+  if(completedRows.length===1) completedRows.push(["No completed serials found for selected period"]);
+
+  // Monthly type matrix
+  const matrixRows=[["Month","Type","Received","Completed","Pending","RTA / Fault","FPY %"]];
   months.forEach(m=>{
-    const total = data[m].T3X + data[m].T2X + data[m].TST;
-    cDone += total;
-    cRta += data[m].rta || 0;
-    kpiRows.push([m,total,data[m].rta || 0,fpyPercent(total,data[m].rta),cDone,cRta,fpyPercent(cDone,cRta)]);
+    if(onlyMonth && m!==onlyMonth) return;
+    typeList.forEach(t=>{
+      const x=data[m][t];
+      matrixRows.push([m,t,x.received,x.completed,x.pending,x.rta,x.completed?Math.max(0,Math.round(((x.completed-x.rta)/x.completed)*100)):""]);
+    });
   });
 
-  const serialRows = [
-    ["Serial","Type","Completed Month","Year","Week Tag","Bay","Slot","Stage","Completed Date","To Finishing","Ever RTA","Currently RTA/Rework"]
-  ];
-  liveCompletedSerialRows.sort((a,b)=>String(a[0]).localeCompare(String(b[0]))).forEach(r => serialRows.push(r));
-  if(liveCompletedSerialRows.length === 0){
-    serialRows.push(["No live completed serial-wise records found for selected year","","","","","","","","","","",""]);
-  }
+  const wb=XLSX.utils.book_new();
+  addSheet(wb,"Executive Summary",summaryRows);
+  addSheet(wb,"Year Type Summary",yearRows);
+  addSheet(wb,"Monthly Type Matrix",matrixRows);
+  addSheet(wb,"Serial Audit",serialRows);
+  addSheet(wb,"Completed Serial Details",completedRows);
 
-  const histRows = [
-    ["Year","Month","Type","Historical Completed","Historical RTA/Fault"]
-  ];
-  months.forEach(m=>typeList.forEach(t=>{
-    histRows.push([selectedYear,m,t,getHistoricalNumber("Completed", selectedYear, m, t),getHistoricalNumber("RTA", selectedYear, m, t)]);
-  }));
+  // Sheet formatting
+  wb.SheetNames.forEach(name=>{
+    const ws=wb.Sheets[name];
+    ws["!freeze"]={xSplit:0,ySplit:name==="Executive Summary"?6:1};
+    ws["!autofilter"]={ref:ws["!ref"]};
+  });
 
-  const oldRows = [
-    ["Serial","Type","Reason","Location/Status"]
-  ];
-  (state.oldSerials || []).forEach(x => oldRows.push([x.serial || "", x.type || "", x.reason || "", x.location || ""]));
-  if(!(state.oldSerials || []).length) oldRows.push(["No old serial re-entry records","","",""]);
-
-  const wb = XLSX.utils.book_new();
-  addSheet(wb, "Dashboard Summary", summaryRows);
-  addSheet(wb, "Type Wise Monthly", typeWiseRows);
-  addSheet(wb, "Serial Wise Completed", serialRows);
-  addSheet(wb, "KPI Trend", kpiRows);
-  addSheet(wb, "Historical Counts", histRows);
-  addSheet(wb, "Old Serial ReEntry", oldRows);
-
-  const stamp = `${selectedYear}_${String(generatedAt.getMonth()+1).padStart(2,"0")}${String(generatedAt.getDate()).padStart(2,"0")}_${String(generatedAt.getHours()).padStart(2,"0")}${String(generatedAt.getMinutes()).padStart(2,"0")}`;
-  XLSX.writeFile(wb, `TRINERGY_MONTHLY_PROGRESS_REPORT_${stamp}.xlsx`);
-  toast("Monthly Excel report downloaded");
+  const period=onlyMonth ? `${onlyMonth}_${selectedYear}` : `YEAR_${selectedYear}`;
+  const fileName=`TRINERGY_MANAGEMENT_REPORT_${excelSafeName(period)}_${generatedAt.toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,fileName);
+  if(typeof toast==="function") toast("Management Excel report downloaded");
+  return true;
 }
+
+/* First-day monthly auto export: previous closed month, once per browser.
+   Browser must have Admin page open and downloads must be allowed. */
+async function autoDownloadPreviousMonthReport(){
+  try{
+    const now=new Date();
+    if(now.getDate()!==1) return;
+    const previous=new Date(now.getFullYear(),now.getMonth()-1,1);
+    const month=months[previous.getMonth()];
+    const year=String(previous.getFullYear());
+    const marker=`trinergyAutoMonthlyReport_${year}_${month}`;
+    if(localStorage.getItem(marker)==="done") return;
+    const ok=await downloadMonthlyExcelReport({year,month});
+    if(ok) localStorage.setItem(marker,"done");
+  }catch(e){
+    console.warn("Automatic monthly report download failed",e);
+  }
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(autoDownloadPreviousMonthReport,5000);
+});
+
 /* ===== END v6.5.3 MONTHLY EXCEL REPORT EXPORT ===== */
 
 </script>
@@ -275,12 +362,12 @@ async function downloadMonthlyExcelReport(){
 <script>
 /* TRINERGY AUTO UPDATE v6.8.1 */
 (function(){
-const LOCAL_BUILD="6.8.1",VERSION_URL=new window.URL("version.json",window.location.href).href.split("?")[0];let last=0,remote=LOCAL_BUILD,busy=null;window.TRINERGY_BUILD=LOCAL_BUILD;window.TRINERGY_UPDATE_REQUIRED=false;
+const LOCAL_BUILD="6.9.0",VERSION_URL=new window.URL("version.json",window.location.href).href.split("?")[0];let last=0,remote=LOCAL_BUILD,busy=null;window.TRINERGY_BUILD=LOCAL_BUILD;window.TRINERGY_UPDATE_REQUIRED=false;
 async function get(force=false){if(!force&&Date.now()-last<5000)return remote;if(busy)return busy;busy=(async()=>{try{const r=await fetch(VERSION_URL+"?ts="+Date.now(),{cache:"no-store",headers:{"Cache-Control":"no-cache,no-store,must-revalidate"}});if(!r.ok)throw Error(r.status);const d=await r.json();remote=String(d.build||LOCAL_BUILD).replace(/^v/i,"");}catch(e){console.warn("Version check unavailable",e);remote=LOCAL_BUILD;}last=Date.now();busy=null;return remote;})();return busy;}
 function overlay(v){if(document.getElementById("trinergyUpdateOverlay"))return;window.TRINERGY_UPDATE_REQUIRED=true;const x=document.createElement("div");x.id="trinergyUpdateOverlay";x.style.cssText="position:fixed;inset:0;z-index:2147483647;background:rgba(4,13,31,.96);display:flex;align-items:center;justify-content:center;color:white;font-family:Arial;text-align:center";x.innerHTML='<div style="max-width:560px;padding:36px;border:1px solid #35517d;border-radius:18px;background:#142442"><div style="font-size:42px">🔄</div><h2>Portal Update Available</h2><p>Build '+LOCAL_BUILD+' → '+v+'</p><p>Latest version automatically load ho rahi hai…</p></div>';document.body.appendChild(x);}
 async function check(force=false){const v=await get(force);if(v!==LOCAL_BUILD){overlay(v);setTimeout(()=>{const u=location.href.split("#")[0].split("?")[0];location.replace(u+"?v="+encodeURIComponent(v)+"&ts="+Date.now());},1200);return false;}return true;}
 window.TrinergyVersionGuard={localBuild:LOCAL_BUILD,check,async canWrite(){if(window.TRINERGY_UPDATE_REQUIRED)return false;return await check(false);}};
-document.addEventListener("DOMContentLoaded",()=>{const b=document.createElement("span");b.textContent="BUILD v6.8.1";b.style.cssText="display:inline-flex;padding:5px 10px;margin-left:8px;border-radius:999px;border:1px solid #35517d;background:#16294b;color:#a9bee3;font-size:11px;font-weight:800";(document.querySelector("header")||document.querySelector(".header")||document.querySelector("h1"))?.appendChild(b);check(true);});window.addEventListener("focus",()=>check(true));document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")check(true);});setInterval(()=>check(false),30000);
+document.addEventListener("DOMContentLoaded",()=>{const b=document.createElement("span");b.textContent="BUILD v6.9.0";b.style.cssText="display:inline-flex;padding:5px 10px;margin-left:8px;border-radius:999px;border:1px solid #35517d;background:#16294b;color:#a9bee3;font-size:11px;font-weight:800";(document.querySelector("header")||document.querySelector(".header")||document.querySelector("h1"))?.appendChild(b);check(true);});window.addEventListener("focus",()=>check(true));document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")check(true);});setInterval(()=>check(false),30000);
 })();
 </script>
 
@@ -469,7 +556,7 @@ window.clearEngineerForm = window.clearEngineerForm || function(){};
   </div>
   <div class="button-row">
     <button class="success" onclick="renderReport()">Generate Report</button>
-    <button class="success" onclick="downloadMonthlyExcelReport()">Download Monthly Excel Report</button>
+    <button class="success" onclick="downloadMonthlyExcelReport()">Download Management Excel Report</button><div class="hint" style="margin-top:8px">Includes year/month summary, received/completed/pending, dates, serial audit and engineer name. On the 1st day, previous month report auto-downloads when Admin opens.</div>
     <button class="secondary" onclick="clearLiveLog()">Clear Live Log</button>
   </div>
   <section class="mini-grid" style="margin-top:16px">
