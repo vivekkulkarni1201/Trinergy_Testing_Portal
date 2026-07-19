@@ -1,6 +1,6 @@
 {
-  "build": "6.8.1",
-  "releasedAt": "2026-07-15",
+  "build": "6.9.0",
+  "releasedAt": "2026-07-19",
   "channel": "production",
-  "notes": "Fix automatic updater URL name collision and restore build badge/version checking."
+  "notes": "Management Excel reporting, monthly auto-export, serial creator engineer traceability."
 }
