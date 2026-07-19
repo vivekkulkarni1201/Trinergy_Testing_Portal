@@ -1,6 +1,6 @@
 {
-  "build": "6.9.0",
+  "build": "6.9.1",
   "releasedAt": "2026-07-19",
   "channel": "production",
-  "notes": "Management Excel reporting, monthly auto-export, serial creator engineer traceability."
+  "notes": "Hotfix: management Excel report function now loads in its own script block."
 }
